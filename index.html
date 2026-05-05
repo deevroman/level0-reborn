@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:,">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="Level0 Reborn v0.1.0">
+  <title>Level0 OpenStreetMap Editor</title>
+  <link rel="stylesheet" href="./src/vendor/leaflet/leaflet.css">
+  <script>
+    (() => {
+      try {
+        const storedTheme = localStorage.getItem("theme_preference_v1");
+        if (storedTheme === "light" || storedTheme === "dark") {
+          document.documentElement.dataset.theme = storedTheme;
+        }
+      } catch {}
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --sidebar-width: 390px;
+      --map-controls-height: 34px;
+      --control-height: 27px;
+      --border: #b7b7b7;
+      --panel: #f6f6f6;
+      --error: #b00020;
+      --info: #2049a8;
+      --success: #0b6b2d;
+      --text: #1b1b1b;
+      --background: #fff;
+      --surface: #fff;
+      --surface-muted: #fbfbfb;
+      --overlay-surface: #fafafa;
+      --control-bg: #fff;
+      --link: #2049a8;
+      --project-mark-border: rgba(27, 27, 27, 0.26);
+      --project-mark-bg: rgba(27, 27, 27, 0.04);
+      --project-mark-text: rgba(27, 27, 27, 0.82);
+      --project-mark-border-hover: rgba(27, 27, 27, 0.52);
+      --project-mark-bg-hover: rgba(27, 27, 27, 0.1);
+      --project-mark-text-hover: rgba(27, 27, 27, 0.96);
+      --dialog-shadow: 0 16px 42px rgba(0, 0, 0, 0.18);
+      --dialog-backdrop: rgba(18, 27, 44, 0.26);
+      --panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+      --map-placeholder-text: #445;
+      --map-placeholder-bg: #eef1f4;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --border: #5d564d;
+        --panel: #24201c;
+        --error: #f0a2ab;
+        --info: #a8bddf;
+        --success: #8ec9a0;
+        --text: #e3ddd4;
+        --background: #1b1815;
+        --surface: #24201c;
+        --surface-muted: #201c18;
+        --overlay-surface: #2a2521;
+        --control-bg: #2f2a25;
+        --link: #b5c7e6;
+        --project-mark-border: rgba(227, 221, 212, 0.22);
+        --project-mark-bg: rgba(227, 221, 212, 0.05);
+        --project-mark-text: rgba(227, 221, 212, 0.84);
+        --project-mark-border-hover: rgba(227, 221, 212, 0.36);
+        --project-mark-bg-hover: rgba(227, 221, 212, 0.1);
+        --project-mark-text-hover: #fff;
+        --dialog-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+        --dialog-backdrop: rgba(0, 0, 0, 0.34);
+        --panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+        --map-placeholder-text: #d4ccc1;
+        --map-placeholder-bg: #2b2824;
+      }
+    }
+
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --border: #5d564d;
+      --panel: #24201c;
+      --error: #f0a2ab;
+      --info: #a8bddf;
+      --success: #8ec9a0;
+      --text: #e3ddd4;
+      --background: #1b1815;
+      --surface: #24201c;
+      --surface-muted: #201c18;
+      --overlay-surface: #2a2521;
+      --control-bg: #2f2a25;
+      --link: #b5c7e6;
+      --project-mark-border: rgba(227, 221, 212, 0.22);
+      --project-mark-bg: rgba(227, 221, 212, 0.05);
+      --project-mark-text: rgba(227, 221, 212, 0.84);
+      --project-mark-border-hover: rgba(227, 221, 212, 0.36);
+      --project-mark-bg-hover: rgba(227, 221, 212, 0.1);
+      --project-mark-text-hover: #fff;
+      --dialog-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+      --dialog-backdrop: rgba(0, 0, 0, 0.34);
+      --panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+      --map-placeholder-text: #d4ccc1;
+      --map-placeholder-bg: #2b2824;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 12px;
+      font-family: sans-serif;
+      font-size: 11pt;
+      color: var(--text);
+      background: var(--background);
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .page-header h2 {
+      margin-bottom: 0;
+      line-height: 1.1;
+    }
+
+    .project-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+      top: -0.08em;
+      vertical-align: middle;
+      line-height: 0;
+    }
+
+    .project-mark button {
+      display: inline-grid;
+      place-items: center;
+      width: 1.35rem;
+      height: 1.35rem;
+      padding: 0;
+      border: 1px solid var(--project-mark-border);
+      border-radius: 999px;
+      background: var(--project-mark-bg);
+      color: var(--project-mark-text);
+      font-size: 0.82rem;
+      line-height: 0;
+      cursor: pointer;
+      transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    }
+
+    .project-mark button:hover,
+    .project-mark button:focus-visible {
+      border-color: var(--project-mark-border-hover);
+      background: var(--project-mark-bg-hover);
+      color: var(--project-mark-text-hover);
+      outline: none;
+    }
+
+    .auth-controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 1.45rem;
+      font-weight: 700;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+      color: var(--text);
+    }
+
+    button {
+      min-height: var(--control-height);
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      background: var(--control-bg);
+      line-height: 1.2;
+    }
+
+    #login[data-auth-ready="false"] {
+      visibility: hidden;
+    }
+
+    input[type="text"] {
+      min-height: var(--control-height);
+      padding: 2px 4px;
+      border: 1px solid var(--border);
+      background: var(--control-bg);
+    }
+
+    input[type="password"],
+    input[type="file"],
+    select {
+      min-height: var(--control-height);
+      border: 1px solid var(--border);
+      background: var(--control-bg);
+    }
+
+    .masked-token-input {
+      -webkit-text-security: disc;
+      text-security: disc;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 500px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      font-family: monospace;
+      font-size: 0.95rem;
+      resize: vertical;
+      background: var(--surface);
+    }
+
+    pre {
+      margin: 0;
+      padding: 12px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      background: var(--surface-muted);
+      font-family: monospace;
+      font-size: 0.92rem;
+    }
+
+    a {
+      color: var(--link);
+    }
+
+    .message-log {
+      min-height: 20px;
+      padding-top: 2px;
+      font-size: 10pt;
+      line-height: 1.35;
+    }
+
+    .message-log[data-type="error"] {
+      color: var(--error);
+    }
+
+    .message-log[data-type="info"] {
+      color: var(--info);
+    }
+
+    .message-log[data-type="success"] {
+      color: var(--success);
+    }
+
+    .project-dialog {
+      width: min(520px, calc(100vw - 28px));
+      padding: 0;
+      border: 1px solid var(--border);
+      box-shadow: var(--dialog-shadow);
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .project-dialog::backdrop {
+      background: var(--dialog-backdrop);
+    }
+
+    .project-dialog-body {
+      padding: 16px 18px 14px;
+      background: var(--surface);
+    }
+
+    .project-dialog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .project-dialog-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .project-dialog-close {
+      flex: 0 0 auto;
+      min-width: 30px;
+      padding: 2px 8px;
+    }
+
+    .project-dialog-body p:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toolbar-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 10px;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .toolbar-row input[type="text"] {
+      max-width: 100%;
+    }
+
+    .toolbar-field {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 100%;
+    }
+
+    .toolbar-field-grow {
+      flex: 1 1 360px;
+      min-width: 260px;
+    }
+
+    .toolbar-field-grow input[type="text"] {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .toolbar-break {
+      flex-basis: 100%;
+      width: 0;
+      height: 0;
+    }
+
+    .toolbar-row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .toolbar-row-main {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .toolbar-actions {
+      flex: 0 0 auto;
+      max-width: 100%;
+      position: relative;
+      z-index: 3000;
+    }
+
+    .toolbar-actions details {
+      margin: 0;
+    }
+
+    .server-settings {
+      position: relative;
+      margin: 0;
+    }
+
+    .server-settings[open] {
+      z-index: 3100;
+    }
+
+    .server-settings-backdrop {
+      display: none;
+    }
+
+    .server-settings[open] .server-settings-backdrop {
+      position: fixed;
+      inset: 0;
+      display: block;
+      background: transparent;
+      z-index: 3100;
+    }
+
+    .server-settings-panel {
+      display: none;
+    }
+
+    .server-settings[open] .server-settings-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      display: block;
+      padding: 8px 10px 12px;
+      width: min(550px, calc(100vw - 36px));
+      border: 1px solid var(--border);
+      background: var(--overlay-surface);
+      box-shadow: var(--panel-shadow);
+      z-index: 3101;
+    }
+
+    .server-settings summary {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      min-height: var(--control-height);
+      padding: 2px 10px;
+      border: 1px solid var(--border);
+      background: var(--overlay-surface);
+      list-style: none;
+      line-height: 1.2;
+    }
+
+    .server-settings summary {
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .server-settings summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .server-settings-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px 14px;
+      margin-top: 12px;
+    }
+
+    .server-settings-grid label {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      font-size: 0.92rem;
+    }
+
+    .server-settings-grid input,
+    .server-settings-grid select {
+      width: 100%;
+      padding: 4px 6px;
+      min-width: 0;
+    }
+
+    .server-settings-hidden {
+      display: none !important;
+    }
+
+    .toolbar-row button,
+    .toolbar-row input,
+    .toolbar-row select {
+      max-width: 100%;
+      vertical-align: middle;
+    }
+
+    .layout {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .editor-column {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      flex: 0 0 var(--sidebar-width);
+    }
+
+    .sidebar-panel {
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .coords-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+
+    .coords-row input {
+      flex: 1 1 auto;
+    }
+
+    #map {
+      height: calc(500px - var(--map-controls-height));
+      margin: 1em 0;
+      border: 1px solid var(--border);
+    }
+
+    .map-placeholder {
+      display: grid;
+      place-items: center;
+      background: var(--map-placeholder-bg);
+      color: var(--map-placeholder-text);
+      text-align: center;
+      font-size: 0.95rem;
+    }
+
+    .validation-list {
+      margin-top: 12px;
+    }
+
+    .validation-item {
+      margin: 0;
+    }
+
+    .validation-item[data-severity="error"] {
+      color: var(--error);
+    }
+
+    .validation-item[data-severity="warning"] {
+      color: var(--info);
+    }
+
+    .secondary-tools {
+      margin-top: 18px;
+    }
+
+    .secondary-tools summary {
+      cursor: pointer;
+    }
+
+    .secondary-tools textarea {
+      min-height: 180px;
+      margin-top: 10px;
+    }
+
+    #osc-section[hidden] {
+      display: none;
+    }
+
+    @media (max-width: 980px) {
+      .layout {
+        flex-direction: column;
+      }
+
+      .editor-column,
+      .sidebar {
+        width: 100%;
+        flex-basis: auto;
+      }
+
+      .editor-column textarea,
+      .editor-column pre,
+      .editor-column details,
+      .editor-column section {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 10px;
+      }
+
+      .page-header {
+        flex-direction: column;
+      }
+
+      .auth-controls {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .toolbar-row button,
+      .toolbar-row input[type="text"] {
+        width: 100%;
+        margin: 0;
+      }
+
+      .toolbar-row input:not([type="text"]),
+      .toolbar-row select {
+        width: 100%;
+        margin: 0;
+      }
+
+      .toolbar-field {
+        width: 100%;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .toolbar-field-grow {
+        min-width: 0;
+      }
+
+      .toolbar-row-top {
+        flex-direction: column;
+      }
+
+      .toolbar-actions {
+        width: 100%;
+      }
+
+      .server-settings[open] .server-settings-panel {
+        right: auto;
+        left: 0;
+        width: min(550px, calc(100vw - 28px));
+      }
+
+      .server-settings-grid label {
+        display: block;
+      }
+
+      .server-settings-grid input,
+      .server-settings-grid select {
+        margin-top: 4px;
+      }
+
+      .coords-row {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+<header class="page-header">
+  <h2>
+    Level0 Reborn
+    <span class="project-mark">
+      <button id="project-info-open" type="button" aria-haspopup="dialog" aria-label="About Level0 Reborn">?</button>
+    </span>
+    ⚠️ Thanks for your interest, but it's still dangerous for everyday use. ⚠️ But stay tuned :)
+  </h2>
+  <p class="auth-controls">
+    <button id="login" type="button" data-auth-ready="false">Log in</button>
+    <button id="logout" type="button">Log out</button>
+  </p>
+  <script>
+    (() => {
+      const defaultServer = {
+        siteUrl: "https://master.apis.dev.openstreetmap.org",
+        apiBase: "https://master.apis.dev.openstreetmap.org/api/0.6/"
+      };
+
+      const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
+      const normalizeApiBase = (value) => {
+        const normalized = String(value || "").trim();
+        if (normalized.length === 0) {
+          return defaultServer.apiBase;
+        }
+        return normalized.endsWith("/") ? normalized : `${normalized}/`;
+      };
+
+      let server = defaultServer;
+      try {
+        const raw = localStorage.getItem("server_settings_v1");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          server = {
+            siteUrl: trimTrailingSlash(parsed.siteUrl || defaultServer.siteUrl),
+            apiBase: normalizeApiBase(parsed.apiBase || defaultServer.apiBase)
+          };
+        }
+      } catch {
+        server = defaultServer;
+      }
+
+      const storageKey = `${server.siteUrl}|${server.apiBase}`;
+      const userName = localStorage.getItem(`osm_user_name:${storageKey}`) || "";
+      const accessToken = localStorage.getItem(`access_token:${storageKey}`) || "";
+      const loginButton = document.getElementById("login");
+
+      if (!loginButton) {
+        return;
+      }
+
+      if (userName.length > 0) {
+        loginButton.textContent = `You're ${userName}`;
+        loginButton.disabled = true;
+      } else if (accessToken.length > 0) {
+        loginButton.disabled = true;
+      }
+
+      loginButton.dataset.authReady = "true";
+    })();
+  </script>
+</header>
+
+<dialog id="project-info-dialog" class="project-dialog" aria-labelledby="project-info-title">
+  <div class="project-dialog-body">
+    <div class="project-dialog-header">
+      <h3 id="project-info-title">About Level0 Reborn</h3>
+      <button id="project-info-close" class="project-dialog-close" type="button" aria-label="Close">×</button>
+    </div>
+    <p>this is Level0 rewritten in JavaScript. No dependence on the server — everything works completely in the browser.</p>
+    <p>The project is still in development and the advanced features are still fully implemented.</p>
+  </div>
+</dialog>
+
+<section class="toolbar" aria-label="Toolbar">
+  <div class="toolbar-row-top">
+    <div class="toolbar-row toolbar-row-main">
+      <label class="toolbar-field toolbar-field-grow" for="url-input">
+        <span>URL or group of IDs like "n54,w33":</span>
+        <input type="text" name="url" id="url-input" autocomplete="off">
+      </label>
+      <span class="toolbar-break" aria-hidden="true"></span>
+      <label class="toolbar-field" for="file-input">
+        <span>OSM or OSC file:</span>
+        <input type="file" id="file-input" accept=".osm,.osc,.xml,text/xml,application/xml">
+      </label>
+      <button id="add" type="button">Add to editor</button>
+      <button id="replace" type="button">Replace data in editor</button>
+      <button id="revert" type="button">Revert changes</button>
+      <button id="clear" type="button">Clear data</button>
+      <span class="toolbar-break" aria-hidden="true"></span>
+    </div>
+
+    <div class="toolbar-actions">
+      <details class="server-settings">
+        <summary>Settings: <span id="current-server-label">OpenStreetMap Dev</span></summary>
+        <span class="server-settings-backdrop" aria-hidden="true"></span>
+        <div class="server-settings-panel">
+          <div class="server-settings-grid">
+            <label>
+              Theme
+              <select id="theme-select">
+                <option value="auto">Auto</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+            <label>
+              Website
+              <select id="server-preset">
+                <option value="osm">OpenStreetMap</option>
+                <option value="osm-dev">OpenStreetMap Dev</option>
+                <option value="ohm">OpenHistoricalMap</option>
+                <option value="ogf">OpenGeofiction</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <label class="server-settings-hidden">
+              Server name
+              <input type="text" id="server-name">
+            </label>
+            <label>
+              Website URL
+              <input type="text" id="server-site-url" placeholder="https://www.openstreetmap.org">
+            </label>
+            <label>
+              API base
+              <input type="text" id="server-api-base" placeholder="https://api.openstreetmap.org/api/0.6/">
+            </label>
+            <label>
+              OAuth client id
+              <input type="text" id="oauth-client-id">
+            </label>
+            <label>
+              OAuth token
+              <input
+                type="text"
+                id="oauth-token"
+                class="masked-token-input"
+                autocomplete="off"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck="false"
+                data-1p-ignore="true"
+                data-lpignore="true"
+                data-bwignore="true"
+              >
+            </label>
+          </div>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <div class="toolbar-row">
+    <button id="download" type="button">Download .osm</button>
+    <button id="validate" type="button">Validate</button>
+    <button id="check" type="button" disabled>Check for conflicts</button>
+    <button id="show-osc" type="button">Show osmChange</button>
+    <span class="toolbar-break" aria-hidden="true"></span>
+    <label class="toolbar-field toolbar-field-grow" for="comment-input">
+      <span>Changeset comment:</span>
+      <input type="text" id="comment-input" maxlength="255" autocomplete="off">
+    </label>
+    <button id="upload" type="button">Upload to OSM</button>
+  </div>
+</section>
+
+<p id="status" class="message-log"></p>
+
+<div class="layout">
+  <div class="editor-column">
+    <textarea id="level0l" aria-label="Level0L editor"></textarea>
+    <div id="validation" class="validation-list"></div>
+
+    <section id="osc-section" hidden>
+      <h2 id="osmchange">OsmChange contents (this will be uploaded to the server)</h2>
+      <pre id="osc-preview"></pre>
+    </section>
+
+    <details class="secondary-tools">
+      <summary>Secondary source panel</summary>
+      <textarea id="osmdata" aria-label="Source data"></textarea>
+      <p style="margin-top: 10px;">
+        <button id="convert" type="button">Convert source to editor</button>
+      </p>
+    </details>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-panel">
+      <input type="hidden" id="center-input" value="">
+      <div class="coords-row">
+        <button id="coord2text" type="button" disabled>&larr;</button>
+        <input type="text" id="coords" value="" disabled>
+        <button id="downarea" type="button" disabled>Edit this area</button>
+      </div>
+      <div id="map" class="map-placeholder">
+        <div>
+          Map panel is not ported yet.
+          <br>
+          URL loading, validation and upload are active.
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<p>
+  Useful links:
+  <a href="https://wiki.openstreetmap.org/wiki/Level0" target="_blank" rel="noreferrer">about Level0</a>,
+  <a href="https://wiki.openstreetmap.org/wiki/Level0L" target="_blank" rel="noreferrer">language reference</a>,
+  <a href="https://wiki.openstreetmap.org/wiki/Map_Features" target="_blank" rel="noreferrer">tag reference</a>,
+  <a href="https://taginfo.openstreetmap.org/" target="_blank" rel="noreferrer">tag statistics</a>.
+</p>
+
+<script src="./src/vendor/leaflet/leaflet.js"></script>
+<script type="module" src="./src/js/app.js"></script>
+</body>
+</html>

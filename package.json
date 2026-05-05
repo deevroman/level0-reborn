@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src tests eslint.config.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "eslint": "9.26.0"
+  }
+}
