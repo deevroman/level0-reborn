@@ -1,10 +1,15 @@
 import { getServerStorageKey } from "./server-config.js";
 
 const COMMENT_DRAFT_KEY_PREFIX = "changeset_comment_draft";
+const COMMENT_HISTORY_KEY_PREFIX = "changeset_comment_history";
 const WORKSPACE_STATE_KEY = "workspace_state_v1";
 
 function getCommentDraftKey(serverConfig) {
   return `${COMMENT_DRAFT_KEY_PREFIX}:${getServerStorageKey(serverConfig)}`;
+}
+
+function getCommentHistoryKey(serverConfig) {
+  return `${COMMENT_HISTORY_KEY_PREFIX}:${getServerStorageKey(serverConfig)}`;
 }
 
 export function loadCommentDraft(serverConfig) {
@@ -17,6 +22,35 @@ export function saveCommentDraft(serverConfig, value) {
 
 export function clearCommentDraft(serverConfig) {
   localStorage.removeItem(getCommentDraftKey(serverConfig));
+}
+
+export function loadCommentHistory(serverConfig) {
+  try {
+    const raw = localStorage.getItem(getCommentHistoryKey(serverConfig));
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((item) => typeof item === "string" && item.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+export function saveCommentHistory(serverConfig, value) {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return;
+  }
+
+  const existing = loadCommentHistory(serverConfig).filter((entry) => entry !== trimmed);
+  existing.unshift(trimmed);
+  localStorage.setItem(getCommentHistoryKey(serverConfig), JSON.stringify(existing.slice(0, 12)));
 }
 
 export function loadWorkspaceState() {

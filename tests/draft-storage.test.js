@@ -4,9 +4,11 @@ import assert from "node:assert/strict";
 import {
   clearCommentDraft,
   clearWorkspaceState,
+  loadCommentHistory,
   loadCommentDraft,
   loadWorkspaceState,
   saveCommentDraft,
+  saveCommentHistory,
   saveWorkspaceState
 } from "../src/js/draft-storage.js";
 import { getPresetServerConfig } from "../src/js/server-config.js";
@@ -78,6 +80,37 @@ test("workspace state is stored and restored", () => {
 
     clearWorkspaceState();
     assert.equal(loadWorkspaceState(), null);
+  } finally {
+    globalThis.localStorage = originalLocalStorage;
+  }
+});
+
+test("comment history is stored per server", () => {
+  const storage = new Map();
+  const originalLocalStorage = globalThis.localStorage;
+  globalThis.localStorage = {
+    getItem(key) {
+      return storage.has(key) ? storage.get(key) : null;
+    },
+    setItem(key, value) {
+      storage.set(key, String(value));
+    },
+    removeItem(key) {
+      storage.delete(key);
+    }
+  };
+
+  try {
+    const osm = getPresetServerConfig("osm");
+    const ogf = getPresetServerConfig("ogf");
+
+    saveCommentHistory(osm, "First comment");
+    saveCommentHistory(osm, "Second comment");
+    saveCommentHistory(ogf, "OGF comment");
+    saveCommentHistory(osm, "Second comment");
+
+    assert.deepEqual(loadCommentHistory(osm), ["Second comment", "First comment"]);
+    assert.deepEqual(loadCommentHistory(ogf), ["OGF comment"]);
   } finally {
     globalThis.localStorage = originalLocalStorage;
   }

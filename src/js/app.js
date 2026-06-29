@@ -13,9 +13,11 @@ import {
 import {
   clearCommentDraft,
   clearWorkspaceState,
+  loadCommentHistory,
   loadCommentDraft,
   loadWorkspaceState,
   saveCommentDraft,
+  saveCommentHistory,
   saveWorkspaceState
 } from "./draft-storage.js";
 import {
@@ -40,7 +42,8 @@ import {
   saveServerConfig
 } from "./server-config.js";
 import { uploadChanges } from "./upload.js";
-import { parseMapViewReference } from "./url.js";
+import { parseMapViewReference, removeQueryParameter } from "./url.js";
+import { countLiteralOccurrences, replaceAllLiteral } from "./search-replace.js";
 
 const THEME_STORAGE_KEY = "theme_preference_v1";
 
@@ -159,6 +162,11 @@ function setEditorLocked(level0lField, locked) {
   level0lField.disabled = locked;
 }
 
+function removeUrlParameterFromAddress(parameterName) {
+  const nextUrl = removeQueryParameter(window.location, parameterName);
+  window.history.replaceState(null, document.title, nextUrl);
+}
+
 function setStatusWithLink(statusElement, message, linkLabel, linkUrl, type = "success") {
   const link = document.createElement("a");
   link.href = linkUrl;
@@ -258,6 +266,21 @@ function syncCommentDraft(commentInput) {
   commentInput.value = loadCommentDraft(state.serverConfig);
 }
 
+function renderCommentHistory(commentHistoryElement) {
+  if (!commentHistoryElement) {
+    return;
+  }
+
+  const history = loadCommentHistory(state.serverConfig);
+  commentHistoryElement.replaceChildren(
+    ...history.map((comment) => {
+      const option = document.createElement("option");
+      option.value = comment;
+      return option;
+    })
+  );
+}
+
 function persistWorkspaceState(urlInput, osmDataField, level0lField) {
   saveWorkspaceState({
     urlValue: urlInput.value,
@@ -266,6 +289,32 @@ function persistWorkspaceState(urlInput, osmDataField, level0lField) {
     baseData: state.baseData,
     oscPreview: state.oscPreview
   });
+}
+
+function updateSearchReplaceCount(countElement, level0lField, searchInput) {
+  const count = countLiteralOccurrences(level0lField.value, searchInput.value);
+  countElement.textContent = `Potential replacements: ${count}`;
+  return count;
+}
+
+function openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement) {
+  const selectedText = level0lField.value.slice(level0lField.selectionStart ?? 0, level0lField.selectionEnd ?? 0);
+  if (selectedText.length > 0) {
+    searchInput.value = selectedText;
+  }
+
+  panelWrap.hidden = false;
+  panelWrap.classList.add("open");
+  openButton?.setAttribute("aria-expanded", "true");
+  updateSearchReplaceCount(countElement, level0lField, searchInput);
+  searchInput.focus();
+  searchInput.select();
+}
+
+function closeSearchReplacePanel(openButton, panelWrap) {
+  panelWrap.classList.remove("open");
+  panelWrap.hidden = true;
+  openButton?.setAttribute("aria-expanded", "false");
 }
 
 function restoreWorkspaceState(
@@ -443,6 +492,7 @@ function bindServerSettings(
   formElements,
   loginButton,
   statusElement,
+  commentHistoryElement,
   urlInput,
   fileInput,
   commentInput,
@@ -472,6 +522,7 @@ function bindServerSettings(
       if (!confirmed) {
         renderServerSettings(formElements, previousConfig);
         syncCommentDraft(formElements.commentInput);
+        renderCommentHistory(commentHistoryElement);
         setStatus(statusElement, "Switch to OpenStreetMap was cancelled.");
         return;
       }
@@ -498,6 +549,7 @@ function bindServerSettings(
       if (!confirmed) {
         renderServerSettings(formElements, previousConfig);
         syncCommentDraft(formElements.commentInput);
+        renderCommentHistory(commentHistoryElement);
         setStatus(statusElement, `Switch to ${nextServerName} was cancelled.`);
         return;
       }
@@ -528,6 +580,7 @@ function bindServerSettings(
       if (!confirmed) {
         renderServerSettings(formElements, previousConfig);
         syncCommentDraft(formElements.commentInput);
+        renderCommentHistory(commentHistoryElement);
         setStatus(statusElement, "Switch to OpenStreetMap Dev was cancelled.");
         return;
       }
@@ -537,6 +590,7 @@ function bindServerSettings(
       } catch (error) {
         renderServerSettings(formElements, previousConfig);
         syncCommentDraft(formElements.commentInput);
+        renderCommentHistory(commentHistoryElement);
         setStatus(statusElement, error.message, "error");
         return;
       }
@@ -551,6 +605,7 @@ function bindServerSettings(
 
     saveServerConfig(state.serverConfig);
     syncCommentDraft(formElements.commentInput);
+    renderCommentHistory(commentHistoryElement);
     await syncLoginStateForCurrentServer(loginButton);
 
     if (shouldOfferSandboxConversion) {
@@ -574,6 +629,7 @@ function bindServerSettings(
       saveServerConfig(state.serverConfig);
       renderServerSettings(formElements, state.serverConfig);
       syncCommentDraft(formElements.commentInput);
+      renderCommentHistory(commentHistoryElement);
       await syncLoginStateForCurrentServer(loginButton);
       setStatus(statusElement, `Saved custom server settings for ${state.serverConfig.name}.`);
     });
@@ -721,6 +777,7 @@ function bindEditorActions(
       oscSectionElement,
       oscPreviewElement
     );
+    removeUrlParameterFromAddress("url");
   });
 
   validateButton.addEventListener("click", () => {
@@ -766,6 +823,7 @@ function bindEditorActions(
 function bindUploadControl(
   uploadButton,
   commentInput,
+  commentHistoryElement,
   level0lField,
   urlInput,
   osmDataField,
@@ -802,6 +860,8 @@ function bindUploadControl(
 
       setStatus(statusElement, `Uploading changes to ${state.serverConfig.name}...`);
       const result = await uploadChanges(uploadData, commentInput.value, state.serverConfig);
+      saveCommentHistory(state.serverConfig, commentInput.value);
+      renderCommentHistory(commentHistoryElement);
       const syncedData = applyDiffResult(uploadData, result.diffResult);
       state.baseData = syncedData.filter((object) => object.type !== "changeset");
       setEditorFromBase(level0lField);
@@ -824,6 +884,70 @@ function bindUploadControl(
   });
 }
 
+function bindSearchReplaceControl(
+  openButton,
+  panelWrap,
+  backdrop,
+  closeButton,
+  searchInput,
+  replaceInput,
+  countElement,
+  applyButton,
+  level0lField,
+  urlInput,
+  osmDataField,
+  statusElement,
+  validationElement,
+  oscSectionElement,
+  oscPreviewElement
+) {
+  const refreshCount = () => updateSearchReplaceCount(countElement, level0lField, searchInput);
+
+  openButton.setAttribute("aria-expanded", "false");
+
+  openButton.addEventListener("click", () => {
+    openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement);
+  });
+
+  closeButton.addEventListener("click", () => {
+    closeSearchReplacePanel(openButton, panelWrap);
+  });
+
+  backdrop.addEventListener("click", () => {
+    closeSearchReplacePanel(openButton, panelWrap);
+  });
+
+  searchInput.addEventListener("input", refreshCount);
+  replaceInput.addEventListener("input", refreshCount);
+  level0lField.addEventListener("input", refreshCount);
+
+  applyButton.addEventListener("click", () => {
+    const search = searchInput.value;
+    if (search.length === 0) {
+      setStatus(statusElement, "Enter text to search for.", "error");
+      return;
+    }
+
+    const occurrences = countLiteralOccurrences(level0lField.value, search);
+    if (occurrences === 0) {
+      setStatus(statusElement, "No matches found.");
+      refreshCount();
+      return;
+    }
+
+    level0lField.value = replaceAllLiteral(level0lField.value, search, replaceInput.value);
+    state.mapController?.refreshFromText();
+    state.oscPreview = "";
+    renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
+    renderValidation(validationElement, []);
+    persistWorkspaceState(urlInput, osmDataField, level0lField);
+    refreshCount();
+    setStatus(statusElement, `Replaced ${occurrences} occurrence(s).`, "success");
+  });
+
+  refreshCount();
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   state.serverConfig = loadServerConfig();
 
@@ -838,6 +962,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const downloadButton = document.querySelector("#download");
   const convertButton = document.querySelector("#convert");
   const uploadButton = document.querySelector("#upload");
+  const searchReplaceOpenButton = document.querySelector("#search-replace-open");
+  const searchReplacePanelWrap = document.querySelector("#search-replace-panel-wrap");
+  const searchReplaceBackdrop = document.querySelector(".search-replace-backdrop");
+  const searchReplaceCloseButton = document.querySelector("#search-replace-close");
+  const searchReplaceSearchInput = document.querySelector("#search-replace-search");
+  const searchReplaceReplaceInput = document.querySelector("#search-replace-replace");
+  const searchReplaceCount = document.querySelector("#search-replace-count");
+  const searchReplaceApplyButton = document.querySelector("#search-replace-apply");
+  const commentHistoryElement = document.querySelector("#comment-history");
   const urlInput = document.querySelector("#url-input");
   const fileInput = document.querySelector("#file-input");
   const commentInput = document.querySelector("#comment-input");
@@ -887,6 +1020,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderServerSettings(serverFormElements, state.serverConfig);
   renderThemeSettings(serverFormElements.themeSelect);
   syncCommentDraft(commentInput);
+  renderCommentHistory(commentHistoryElement);
   restoreWorkspaceState(
     urlInput,
     osmDataField,
@@ -920,10 +1054,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindProjectInfo(projectInfoOpenButton, projectInfoDialog, projectInfoCloseButton);
   bindThemeSettings(serverFormElements.themeSelect);
   bindWorkspacePersistence(urlInput, osmDataField, level0lField);
+  bindSearchReplaceControl(
+    searchReplaceOpenButton,
+    searchReplacePanelWrap,
+    searchReplaceBackdrop,
+    searchReplaceCloseButton,
+    searchReplaceSearchInput,
+    searchReplaceReplaceInput,
+    searchReplaceCount,
+    searchReplaceApplyButton,
+    level0lField,
+    urlInput,
+    osmDataField,
+    statusElement,
+    validationElement,
+    oscSectionElement,
+    oscPreviewElement
+  );
+  commentInput.addEventListener("focus", () => {
+    renderCommentHistory(commentHistoryElement);
+  });
   bindServerSettings(
     serverFormElements,
     loginButton,
     statusElement,
+    commentHistoryElement,
     urlInput,
     fileInput,
     commentInput,
@@ -954,6 +1109,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindUploadControl(
     uploadButton,
     commentInput,
+    commentHistoryElement,
     level0lField,
     urlInput,
     osmDataField,

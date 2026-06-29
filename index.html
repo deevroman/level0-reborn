@@ -432,6 +432,91 @@
       display: none;
     }
 
+    .search-replace {
+      position: relative;
+      margin: 0;
+    }
+
+    .search-replace.open {
+      z-index: 3100;
+    }
+
+    .search-replace-backdrop {
+      display: none;
+    }
+
+    .search-replace.open .search-replace-backdrop {
+      position: fixed;
+      inset: 0;
+      display: block;
+      background: transparent;
+      z-index: 3100;
+    }
+
+    .search-replace-panel {
+      display: none;
+    }
+
+    .search-replace.open .search-replace-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      display: block;
+      padding: 8px 10px 12px;
+      width: min(550px, calc(100vw - 36px));
+      border: 1px solid var(--border);
+      background: var(--overlay-surface);
+      box-shadow: var(--panel-shadow);
+      z-index: 3101;
+    }
+
+    .search-replace-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .search-replace-header h3 {
+      margin: 0;
+      font-size: 1.02rem;
+    }
+
+    .search-replace-close {
+      flex: 0 0 auto;
+      min-width: 30px;
+      padding: 2px 8px;
+    }
+
+    .search-replace-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px 14px;
+      margin-top: 12px;
+    }
+
+    .search-replace-grid label {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      font-size: 0.92rem;
+    }
+
+    .search-replace-grid input {
+      width: 100%;
+      min-width: 0;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      background: var(--control-bg);
+    }
+
+    .search-replace-count {
+      margin: 0;
+      font-size: 0.92rem;
+    }
+
     .server-settings-grid {
       display: grid;
       grid-template-columns: 1fr;
@@ -726,6 +811,29 @@
     </div>
 
     <div class="toolbar-actions">
+      <div class="search-replace" id="search-replace-panel-wrap" hidden>
+        <span class="search-replace-backdrop" aria-hidden="true"></span>
+        <div class="search-replace-panel" role="dialog" aria-labelledby="search-replace-title" aria-modal="true">
+          <div class="search-replace-header">
+            <h3 id="search-replace-title">Search and replace</h3>
+            <button id="search-replace-close" class="search-replace-close" type="button" aria-label="Close">×</button>
+          </div>
+          <div class="search-replace-grid">
+            <label>
+              Search
+              <input type="text" id="search-replace-search" autocomplete="off" spellcheck="false">
+            </label>
+            <label>
+              Replace with
+              <input type="text" id="search-replace-replace" autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+          <p id="search-replace-count" class="search-replace-count">Potential replacements: 0</p>
+          <p style="margin-top: 10px;">
+            <button id="search-replace-apply" type="button">Replace all</button>
+          </p>
+        </div>
+      </div>
       <details class="server-settings">
         <summary>Settings: <span id="current-server-label">OpenStreetMap Dev</span></summary>
         <span class="server-settings-backdrop" aria-hidden="true"></span>
@@ -791,11 +899,13 @@
     <button id="validate" type="button">Validate</button>
     <button id="check" type="button" disabled>Check for conflicts</button>
     <button id="show-osc" type="button">Show osmChange</button>
+    <button id="search-replace-open" type="button">Search and replace</button>
     <span class="toolbar-break" aria-hidden="true"></span>
     <label class="toolbar-field toolbar-field-grow" for="comment-input">
       <span>Changeset comment:</span>
-      <input type="text" id="comment-input" maxlength="255" autocomplete="off">
+      <input type="text" id="comment-input" maxlength="255" autocomplete="off" list="comment-history">
     </label>
+    <datalist id="comment-history"></datalist>
     <button id="upload" type="button">Upload to OSM</button>
   </div>
 </section>

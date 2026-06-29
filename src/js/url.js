@@ -64,6 +64,12 @@ export function parseMapViewReference(input) {
   return null;
 }
 
+export function removeQueryParameter(urlLike, parameterName) {
+  const url = new URL(urlLike.href ?? urlLike.toString());
+  url.searchParams.delete(parameterName);
+  return `${url.origin}${url.pathname}${url.search}${url.hash}`;
+}
+
 function buildApiUrl(osmServer, path) {
   return `${osmServer.apiBase}${path}`;
 }

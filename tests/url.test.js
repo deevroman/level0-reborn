@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { getPresetServerConfig } from "../src/js/server-config.js";
-import { parseMapViewReference, urlToApiRequests } from "../src/js/url.js";
+import { parseMapViewReference, removeQueryParameter, urlToApiRequests } from "../src/js/url.js";
 
 const DEV_SERVER = getPresetServerConfig("osm-dev");
 const OGF_SERVER = getPresetServerConfig("ogf");
@@ -96,5 +96,12 @@ test("parseMapViewReference keeps zoom lat and lon from map references", () => {
   assert.deepEqual(
     parseMapViewReference("15/45.3222/37.3043"),
     { zoom: 15, lat: 45.3222, lon: 37.3043 }
+  );
+});
+
+test("removeQueryParameter removes only the requested query parameter", () => {
+  assert.equal(
+    removeQueryParameter("https://example.com/editor?url=map%3D15%2F1%2F2&theme=dark#section", "url"),
+    "https://example.com/editor?theme=dark#section"
   );
 });
