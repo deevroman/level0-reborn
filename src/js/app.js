@@ -155,6 +155,10 @@ function clearStatus(statusElement) {
   setStatus(statusElement, "", "info");
 }
 
+function setEditorLocked(level0lField, locked) {
+  level0lField.disabled = locked;
+}
+
 function setStatusWithLink(statusElement, message, linkLabel, linkUrl, type = "success") {
   const link = document.createElement("a");
   link.href = linkUrl;
@@ -961,12 +965,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const { overpassUrl } = await restoreSession(loginButton);
   if (overpassUrl) {
-    const loaded = await loadSupportedUrl(overpassUrl, state.serverConfig);
-    state.baseData = loaded.data;
-    osmDataField.value = loaded.raw;
-    level0lField.value = osmDataToL0L(loaded.data);
-    state.mapController?.refreshFromText();
-    persistWorkspaceState(urlInput, osmDataField, level0lField);
-    setStatus(statusElement, `Loaded ${loaded.data.length} object(s) from ${state.serverConfig.name}.`);
+    setEditorLocked(level0lField, true);
+    setStatus(statusElement, `Loading data from URL parameter...`);
+
+    try {
+      const loaded = await loadSupportedUrl(overpassUrl, state.serverConfig);
+      state.baseData = loaded.data;
+      osmDataField.value = loaded.raw;
+      level0lField.value = osmDataToL0L(loaded.data);
+      state.mapController?.refreshFromText();
+      persistWorkspaceState(urlInput, osmDataField, level0lField);
+      setStatus(statusElement, `Loaded ${loaded.data.length} object(s) from ${state.serverConfig.name}.`);
+    } catch (error) {
+      setStatus(statusElement, error.message, "error");
+    } finally {
+      setEditorLocked(level0lField, false);
+    }
   }
 });
