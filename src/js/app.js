@@ -25,6 +25,7 @@ import {
 import {
   applyDiffResult,
   indexBaseData,
+  remapPendingUploadData,
   prepareUploadData
 } from "./export.js";
 import {
@@ -1018,9 +1019,10 @@ async function uploadPreparedDataInGroups(
     saveCommentHistory(serverConfig, comment);
     renderCommentHistory(commentHistoryElement);
     workingData = applyDiffResult(workingData, result.diffResult);
+    logSplitProgress(index + 1, groups.length, groups[index], result.changesetId);
 
     for (let remainingIndex = index + 1; remainingIndex < groups.length; remainingIndex += 1) {
-      groups[remainingIndex] = applyDiffResult(groups[remainingIndex], result.diffResult);
+      groups[remainingIndex] = remapPendingUploadData(groups[remainingIndex], result.diffResult);
     }
 
     state.baseData = workingData.filter(
@@ -1034,6 +1036,31 @@ async function uploadPreparedDataInGroups(
   return {
     changesetIds
   };
+}
+
+function logSplitProgress(step, totalSteps, group, changesetId) {
+  const counts = group.reduce((accumulator, object) => {
+    if (object.type === "changeset") {
+      accumulator.changeset += 1;
+    } else if (object.action === "create") {
+      accumulator.create += 1;
+    } else if (object.action === "modify") {
+      accumulator.modify += 1;
+    } else if (object.action === "delete") {
+      accumulator.delete += 1;
+    } else {
+      accumulator.clean += 1;
+    }
+
+    return accumulator;
+  }, { changeset: 0, create: 0, modify: 0, delete: 0, clean: 0 });
+
+  console.log("[upload-split] uploaded group", {
+    step,
+    totalSteps,
+    changesetId,
+    counts
+  });
 }
 
 function bindSearchReplaceControl(

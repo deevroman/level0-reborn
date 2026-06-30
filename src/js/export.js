@@ -349,6 +349,44 @@ export function applyDiffResult(data, diffEntries) {
     });
 }
 
+export function remapPendingUploadData(data, diffEntries) {
+  const cloned = cloneData(data);
+  const diffMap = new Map(
+    diffEntries.map((entry) => [`${entry.type}${entry.oldId}`, entry])
+  );
+  const idMap = new Map();
+
+  for (const entry of diffEntries) {
+    if (entry.newId !== null && entry.newId !== undefined) {
+      idMap.set(`${entry.type}${entry.oldId}`, entry.newId);
+    }
+  }
+
+  for (const object of cloned) {
+    if (object.type === "way") {
+      object.nodes = (object.nodes ?? []).map((nodeId) => idMap.get(`node${nodeId}`) ?? nodeId);
+    } else if (object.type === "relation") {
+      object.members = (object.members ?? []).map((member) => ({
+        ...member,
+        id: idMap.get(`${member.type}${member.id}`) ?? member.id
+      }));
+    }
+
+    if (object.id > 0) {
+      const diffEntry = diffMap.get(buildObjectKey(object));
+      if (diffEntry?.newId !== null && diffEntry?.newId !== undefined) {
+        object.id = diffEntry.newId;
+      }
+
+      if (diffEntry?.newVersion !== null && diffEntry?.newVersion !== undefined) {
+        object.version = diffEntry.newVersion;
+      }
+    }
+  }
+
+  return cloned;
+}
+
 export function buildRefreshReference(data) {
   return data
     .filter((object) => object.type !== "changeset")

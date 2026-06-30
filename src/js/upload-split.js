@@ -2,6 +2,15 @@ const KM_PER_DEGREE_LAT = 111.32;
 const DEFAULT_MAX_SPLITS = 4;
 const DEFAULT_MIN_SPLIT_SIZE_KM = 10;
 
+function logSplit(message, details) {
+  if (details === undefined) {
+    console.log(`[upload-split] ${message}`);
+    return;
+  }
+
+  console.log(`[upload-split] ${message}`, details);
+}
+
 function buildObjectKey(object) {
   return `${object.type}${object.id}`;
 }
@@ -128,6 +137,11 @@ function collectSpatialItems(uploadData, baseData) {
   const cache = new Map();
   const items = [];
 
+  logSplit("collecting bboxes", {
+    uploadObjects: uploadData.length,
+    baseObjects: baseData.length
+  });
+
   for (const object of uploadData) {
     if (object.type === "changeset") {
       continue;
@@ -135,6 +149,7 @@ function collectSpatialItems(uploadData, baseData) {
 
     const bbox = resolveObjectBbox(buildObjectKey(object), currentIndex, baseIndex, cache, new Set());
     if (!bbox) {
+      logSplit("cannot resolve bbox for object, disabling split", buildObjectKey(object));
       return null;
     }
 
@@ -177,11 +192,21 @@ function bestSplitForAxis(items, axis) {
   const sortedCenters = [...new Set(items.map((item) => item.center[axis]))].sort((left, right) => left - right);
   let best = null;
 
+  logSplit(`searching ${axis} split`, {
+    items: items.length,
+    candidates: sortedCenters.length
+  });
+
   for (let index = 0; index < sortedCenters.length - 1; index += 1) {
     const divider = (sortedCenters[index] + sortedCenters[index + 1]) / 2;
     const [left, right] = partitionItems(items, divider, axis);
 
     if (left.length === 0 || right.length === 0) {
+      logSplit(`skipped empty ${axis} half`, {
+        divider,
+        left: left.length,
+        right: right.length
+      });
       continue;
     }
 
@@ -201,6 +226,12 @@ function bestSplitForAxis(items, axis) {
         right,
         score
       };
+      logSplit(`new best ${axis} split`, {
+        divider,
+        left: left.length,
+        right: right.length,
+        score
+      });
     }
   }
 
@@ -229,17 +260,53 @@ function findBestSplit(items) {
 function splitItems(items, remainingGroups, minSplitSizeKm) {
   const bbox = buildGroupBbox(items);
   if (!bbox || remainingGroups <= 1 || items.length <= 1) {
+    logSplit("stop splitting", {
+      items: items.length,
+      remainingGroups,
+      reason: !bbox ? "missing bbox" : remainingGroups <= 1 ? "group limit reached" : "single item"
+    });
     return [items];
   }
 
   if (bboxWidthKm(bbox) < minSplitSizeKm && bboxHeightKm(bbox) < minSplitSizeKm) {
+    logSplit("stop splitting", {
+      items: items.length,
+      remainingGroups,
+      reason: "bbox below minimum size",
+      widthKm: bboxWidthKm(bbox),
+      heightKm: bboxHeightKm(bbox)
+    });
     return [items];
   }
 
   const bestSplit = findBestSplit(items);
   if (!bestSplit || bestSplit.score > bboxAreaKm2(bbox)) {
+    logSplit("stop splitting", {
+      items: items.length,
+      remainingGroups,
+      reason: "no improving split"
+    });
     return [items];
   }
+
+  if (bestSplit.left.length === 0 || bestSplit.right.length === 0) {
+    logSplit("refused empty split", {
+      items: items.length,
+      remainingGroups,
+      left: bestSplit.left.length,
+      right: bestSplit.right.length
+    });
+    return [items];
+  }
+
+  logSplit("split accepted", {
+    items: items.length,
+    remainingGroups,
+    axis: bestSplit.axis,
+    divider: bestSplit.divider,
+    left: bestSplit.left.length,
+    right: bestSplit.right.length
+  });
 
   let bestGroups = [items];
   let bestScore = bboxAreaKm2(bbox);
