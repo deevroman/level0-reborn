@@ -15,9 +15,11 @@ import {
   clearWorkspaceState,
   loadCommentHistory,
   loadCommentDraft,
+  loadSearchReplaceState,
   loadWorkspaceState,
   saveCommentDraft,
   saveCommentHistory,
+  saveSearchReplaceState,
   saveWorkspaceState
 } from "./draft-storage.js";
 import {
@@ -41,6 +43,7 @@ import {
   normalizeServerConfig,
   saveServerConfig
 } from "./server-config.js";
+import { splitUploadDataIntoGroups } from "./upload-split.js";
 import { uploadChanges } from "./upload.js";
 import { parseMapViewReference, removeQueryParameter } from "./url.js";
 import { countLiteralOccurrences, replaceAllLiteral } from "./search-replace.js";
@@ -182,6 +185,30 @@ function setStatusWithLink(statusElement, message, linkLabel, linkUrl, type = "s
   );
 }
 
+function setStatusWithLinks(statusElement, message, links, type = "success") {
+  const nodes = [document.createTextNode(message)];
+
+  links.forEach((linkInfo, index) => {
+    const link = document.createElement("a");
+    link.href = linkInfo.url;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = linkInfo.label;
+    nodes.push(link);
+
+    if (index < links.length - 1) {
+      nodes.push(document.createTextNode(", "));
+    }
+  });
+
+  if (links.length > 0) {
+    nodes.push(document.createTextNode("."));
+  }
+
+  statusElement.dataset.type = type;
+  statusElement.replaceChildren(...nodes);
+}
+
 function renderValidation(validationElement, validation) {
   validationElement.replaceChildren();
 
@@ -295,6 +322,13 @@ function updateSearchReplaceCount(countElement, level0lField, searchInput) {
   const count = countLiteralOccurrences(level0lField.value, searchInput.value);
   countElement.textContent = `Potential replacements: ${count}`;
   return count;
+}
+
+function persistSearchReplaceState(searchInput, replaceInput) {
+  saveSearchReplaceState({
+    searchValue: searchInput.value,
+    replaceValue: replaceInput.value
+  });
 }
 
 function openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement) {
@@ -822,6 +856,7 @@ function bindEditorActions(
 
 function bindUploadControl(
   uploadButton,
+  splitUploadButton,
   commentInput,
   commentHistoryElement,
   level0lField,
@@ -858,12 +893,14 @@ function bindUploadControl(
         throw new Error("Please enter changeset comment.");
       }
 
-      setStatus(statusElement, `Uploading changes to ${state.serverConfig.name}...`);
-      const result = await uploadChanges(uploadData, commentInput.value, state.serverConfig);
-      saveCommentHistory(state.serverConfig, commentInput.value);
-      renderCommentHistory(commentHistoryElement);
-      const syncedData = applyDiffResult(uploadData, result.diffResult);
-      state.baseData = syncedData.filter((object) => object.type !== "changeset");
+      const result = await uploadPreparedDataOnce(
+        uploadData,
+        commentInput.value,
+        state.serverConfig,
+        statusElement,
+        commentHistoryElement
+      );
+
       setEditorFromBase(level0lField);
       commentInput.value = "";
       clearCommentDraft(state.serverConfig);
@@ -882,6 +919,121 @@ function bindUploadControl(
       setStatus(statusElement, error.message, "error");
     }
   });
+
+  splitUploadButton.addEventListener("click", async () => {
+    try {
+      const uploadData = buildUploadData(level0lField, validationElement);
+      const pendingChanges = uploadData.filter((object) => object.action);
+
+      if (pendingChanges.length === 0) {
+        throw new Error("Nothing to upload.");
+      }
+
+      if (!commentInput.value.trim() && !uploadData.some((object) => object.type === "changeset" && object.id <= 0 && object.tags.comment)) {
+        throw new Error("Please enter changeset comment.");
+      }
+
+      const result = await uploadPreparedDataInGroups(
+        uploadData,
+        commentInput.value,
+        state.serverConfig,
+        state.baseData,
+        statusElement,
+        urlInput,
+        osmDataField,
+        level0lField,
+        commentHistoryElement
+      );
+
+      setEditorFromBase(level0lField);
+      commentInput.value = "";
+      clearCommentDraft(state.serverConfig);
+      renderValidation(validationElement, []);
+      state.oscPreview = "";
+      renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
+      persistWorkspaceState(urlInput, osmDataField, level0lField);
+
+      if (result.changesetIds.length > 1) {
+        setStatusWithLinks(
+          statusElement,
+          "Uploaded split changesets: ",
+          result.changesetIds.map((changesetId) => ({
+            label: String(changesetId),
+            url: `${state.serverConfig.siteUrl}/changeset/${changesetId}`
+          })),
+          "success"
+        );
+      } else {
+        const changesetId = result.changesetIds[0];
+        setStatusWithLink(
+          statusElement,
+          "Changeset uploaded successfully: ",
+          String(changesetId),
+          `${state.serverConfig.siteUrl}/changeset/${changesetId}`,
+          "success"
+        );
+      }
+    } catch (error) {
+      setStatus(statusElement, error.message, "error");
+    }
+  });
+}
+
+async function uploadPreparedDataOnce(uploadData, comment, serverConfig, statusElement, commentHistoryElement) {
+  setStatus(statusElement, `Uploading changes to ${serverConfig.name}...`);
+  const result = await uploadChanges(uploadData, comment, serverConfig);
+  saveCommentHistory(serverConfig, comment);
+  renderCommentHistory(commentHistoryElement);
+  const syncedData = applyDiffResult(uploadData, result.diffResult);
+  state.baseData = syncedData.filter((object) => object.type !== "changeset");
+  return result;
+}
+
+async function uploadPreparedDataInGroups(
+  uploadData,
+  comment,
+  serverConfig,
+  baseData,
+  statusElement,
+  urlInput,
+  osmDataField,
+  level0lField,
+  commentHistoryElement
+) {
+  const groups = splitUploadDataIntoGroups(uploadData, baseData, {
+    maxGroups: 4,
+    minSplitSizeKm: 10
+  });
+  const changesetIds = [];
+  let workingData = uploadData;
+
+  for (let index = 0; index < groups.length; index += 1) {
+    setStatus(
+      statusElement,
+      `Uploading changes to ${serverConfig.name} (${index + 1}/${groups.length})...`
+    );
+
+    const result = await uploadChanges(groups[index], comment, serverConfig);
+    changesetIds.push(result.changesetId);
+    saveCommentHistory(serverConfig, comment);
+    renderCommentHistory(commentHistoryElement);
+    workingData = applyDiffResult(workingData, result.diffResult);
+
+    for (let remainingIndex = index + 1; remainingIndex < groups.length; remainingIndex += 1) {
+      groups[remainingIndex] = applyDiffResult(groups[remainingIndex], result.diffResult);
+    }
+
+    state.baseData = workingData.filter(
+      (object) => object.type !== "changeset" && !object.action
+    );
+    level0lField.value = dataToLevel0L(workingData);
+    state.mapController?.refreshFromText();
+    persistWorkspaceState(urlInput, osmDataField, level0lField);
+  }
+
+  return {
+    changesetIds
+  };
 }
 
 function bindSearchReplaceControl(
@@ -902,11 +1054,16 @@ function bindSearchReplaceControl(
   oscPreviewElement
 ) {
   const refreshCount = () => updateSearchReplaceCount(countElement, level0lField, searchInput);
+  const persistedSearchReplaceState = loadSearchReplaceState();
+
+  searchInput.value = persistedSearchReplaceState.searchValue;
+  replaceInput.value = persistedSearchReplaceState.replaceValue;
 
   openButton.setAttribute("aria-expanded", "false");
 
   openButton.addEventListener("click", () => {
     openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement);
+    persistSearchReplaceState(searchInput, replaceInput);
   });
 
   closeButton.addEventListener("click", () => {
@@ -917,8 +1074,14 @@ function bindSearchReplaceControl(
     closeSearchReplacePanel(openButton, panelWrap);
   });
 
-  searchInput.addEventListener("input", refreshCount);
-  replaceInput.addEventListener("input", refreshCount);
+  searchInput.addEventListener("input", () => {
+    persistSearchReplaceState(searchInput, replaceInput);
+    refreshCount();
+  });
+  replaceInput.addEventListener("input", () => {
+    persistSearchReplaceState(searchInput, replaceInput);
+    refreshCount();
+  });
   level0lField.addEventListener("input", refreshCount);
 
   applyButton.addEventListener("click", () => {
@@ -962,6 +1125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const downloadButton = document.querySelector("#download");
   const convertButton = document.querySelector("#convert");
   const uploadButton = document.querySelector("#upload");
+  const splitUploadButton = document.querySelector("#split-upload");
   const searchReplaceOpenButton = document.querySelector("#search-replace-open");
   const searchReplacePanelWrap = document.querySelector("#search-replace-panel-wrap");
   const searchReplaceBackdrop = document.querySelector(".search-replace-backdrop");
@@ -1108,6 +1272,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
   bindUploadControl(
     uploadButton,
+    splitUploadButton,
     commentInput,
     commentHistoryElement,
     level0lField,

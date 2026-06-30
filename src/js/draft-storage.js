@@ -2,6 +2,7 @@ import { getServerStorageKey } from "./server-config.js";
 
 const COMMENT_DRAFT_KEY_PREFIX = "changeset_comment_draft";
 const COMMENT_HISTORY_KEY_PREFIX = "changeset_comment_history";
+const SEARCH_REPLACE_STATE_KEY = "search_replace_state_v1";
 const WORKSPACE_STATE_KEY = "workspace_state_v1";
 
 function getCommentDraftKey(serverConfig) {
@@ -51,6 +52,36 @@ export function saveCommentHistory(serverConfig, value) {
   const existing = loadCommentHistory(serverConfig).filter((entry) => entry !== trimmed);
   existing.unshift(trimmed);
   localStorage.setItem(getCommentHistoryKey(serverConfig), JSON.stringify(existing.slice(0, 12)));
+}
+
+export function loadSearchReplaceState() {
+  try {
+    const raw = localStorage.getItem(SEARCH_REPLACE_STATE_KEY);
+    if (!raw) {
+      return {
+        searchValue: "",
+        replaceValue: ""
+      };
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      searchValue: typeof parsed.searchValue === "string" ? parsed.searchValue : "",
+      replaceValue: typeof parsed.replaceValue === "string" ? parsed.replaceValue : ""
+    };
+  } catch {
+    return {
+      searchValue: "",
+      replaceValue: ""
+    };
+  }
+}
+
+export function saveSearchReplaceState(searchReplaceState) {
+  localStorage.setItem(SEARCH_REPLACE_STATE_KEY, JSON.stringify({
+    searchValue: searchReplaceState.searchValue ?? "",
+    replaceValue: searchReplaceState.replaceValue ?? ""
+  }));
 }
 
 export function loadWorkspaceState() {
