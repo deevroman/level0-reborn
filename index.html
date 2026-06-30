@@ -308,6 +308,28 @@
       margin-bottom: 0;
     }
 
+    .split-preview-list {
+      margin: 12px 0 14px;
+      padding-left: 18px;
+    }
+
+    .split-preview-list li + li {
+      margin-top: 4px;
+    }
+
+    .split-preview-note {
+      margin: 10px 0 0;
+      font-size: 0.94rem;
+      color: var(--text);
+    }
+
+    .split-preview-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+
     .toolbar {
       display: flex;
       flex-direction: column;
@@ -789,6 +811,22 @@
     </div>
     <p>this is Level0 rewritten in JavaScript. No dependence on the server — everything works completely in the browser.</p>
     <p>The project is still in development and the advanced features are still fully implemented.</p>
+  </div>
+</dialog>
+
+<dialog id="split-preview-dialog" class="project-dialog" aria-labelledby="split-preview-title">
+  <div class="project-dialog-body">
+    <div class="project-dialog-header">
+      <h3 id="split-preview-title">Upload split preview</h3>
+      <button id="split-preview-close" class="project-dialog-close" type="button" aria-label="Close">×</button>
+    </div>
+    <p id="split-preview-summary"></p>
+    <ul id="split-preview-list" class="split-preview-list"></ul>
+    <p class="split-preview-note">The proposed bounding boxes are highlighted on the map. Cancel to adjust the selection or continue to upload the groups.</p>
+    <div class="split-preview-actions">
+      <button id="split-preview-cancel" type="button">Cancel</button>
+      <button id="split-preview-confirm" type="button">Upload split</button>
+    </div>
   </div>
 </dialog>
 

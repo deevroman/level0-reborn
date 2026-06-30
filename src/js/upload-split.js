@@ -331,6 +331,21 @@ function splitItems(items, remainingGroups, minSplitSizeKm) {
   return bestGroups;
 }
 
+function buildGroupBboxFromObjects(group, bboxMap) {
+  let bbox = null;
+
+  for (const object of group) {
+    if (object.type === "changeset") {
+      continue;
+    }
+
+    const objectBbox = bboxMap.get(buildObjectKey(object));
+    bbox = unionBbox(bbox, objectBbox);
+  }
+
+  return bbox;
+}
+
 export function collectUploadObjectBboxes(uploadData, baseData = []) {
   const items = collectSpatialItems(uploadData, baseData);
   if (!items) {
@@ -364,4 +379,27 @@ export function splitUploadDataIntoGroups(uploadData, baseData = [], options = {
   }
 
   return splitGroups.map((group) => [...changesetObjects, ...group]);
+}
+
+export function buildUploadSplitPlan(uploadData, baseData = [], options = {}) {
+  const bboxMap = collectUploadObjectBboxes(uploadData, baseData);
+  const groups = splitUploadDataIntoGroups(uploadData, baseData, options);
+  const groupSummaries = groups.map((group) => {
+    const groupBbox = bboxMap ? buildGroupBboxFromObjects(group, bboxMap) : null;
+    return {
+      objects: group,
+      objectCount: group.filter((object) => object.type !== "changeset").length,
+      bbox: groupBbox
+    };
+  });
+
+  logSplit("prepared split plan", {
+    groups: groupSummaries.length,
+    objectCounts: groupSummaries.map((group) => group.objectCount)
+  });
+
+  return {
+    groups,
+    groupSummaries
+  };
 }

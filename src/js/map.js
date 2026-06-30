@@ -102,6 +102,10 @@ export function initMapEditor({
   const objectWays = leaflet.layerGroup().addTo(map);
   const objectNodes = leaflet.layerGroup().addTo(map);
   const selectionWays = leaflet.layerGroup().addTo(map);
+  const splitPreviewLayer = leaflet.layerGroup().addTo(map);
+  const splitPreviewState = {
+    view: null
+  };
 
   function checkZoom() {
     downareaButton.disabled = map.getZoom() < 15;
@@ -169,6 +173,62 @@ export function initMapEditor({
     }
   }
 
+  function clearSplitPreview(restoreView = true) {
+    splitPreviewLayer.clearLayers();
+
+    if (restoreView && splitPreviewState.view) {
+      map.setView(splitPreviewState.view.center, splitPreviewState.view.zoom, { animate: false });
+      marker.setLatLng(map.getCenter());
+      updateCoords();
+      checkZoom();
+    }
+
+    splitPreviewState.view = null;
+  }
+
+  function renderSplitPreview(groupBboxes) {
+    clearSplitPreview(false);
+
+    const validBboxes = groupBboxes.filter((bbox) => bbox);
+    if (validBboxes.length === 0) {
+      return;
+    }
+
+    splitPreviewState.view = {
+      center: leaflet.latLng(map.getCenter()),
+      zoom: map.getZoom()
+    };
+
+    const previewBounds = [];
+    const colors = ["#d9480f", "#5f3dc4", "#2f9e44", "#0b7285"];
+
+    validBboxes.forEach((bbox, index) => {
+      const bounds = leaflet.latLngBounds(
+        [bbox.minLat, bbox.minLon],
+        [bbox.maxLat, bbox.maxLon]
+      );
+      previewBounds.push(bounds);
+      splitPreviewLayer.addLayer(leaflet.rectangle(bounds, {
+        color: colors[index % colors.length],
+        weight: 2,
+        fillColor: colors[index % colors.length],
+        fillOpacity: 0.08,
+        dashArray: "5 4",
+        interactive: false
+      }));
+    });
+
+    const unionBounds = previewBounds.reduce((accumulator, bounds) => (
+      accumulator ? accumulator.extend(bounds) : bounds
+    ), null);
+
+    if (unionBounds) {
+      map.fitBounds(unionBounds.pad(0.08), { animate: false });
+      marker.setLatLng(map.getCenter());
+      updateCoords();
+    }
+  }
+
   map.on("moveend", checkZoom);
   marker.on("dragend", () => {
     map.panTo(marker.getLatLng());
@@ -221,6 +281,12 @@ export function initMapEditor({
     },
     getMapCenterString() {
       return getCenter(",");
+    },
+    renderSplitPreview(groupBboxes) {
+      renderSplitPreview(groupBboxes);
+    },
+    clearSplitPreview() {
+      clearSplitPreview();
     }
   };
 }

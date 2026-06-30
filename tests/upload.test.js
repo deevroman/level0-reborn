@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createChangesetXml, parseDiffResult, uploadChanges } from "../src/js/upload.js";
+import { GENERATOR } from "../src/js/config.js";
 
 test("createChangesetXml includes comment and created_by", () => {
   const xml = createChangesetXml(
@@ -19,7 +20,7 @@ test("createChangesetXml includes comment and created_by", () => {
 
   assert.match(xml, /k='comment' v='Fix crossing'/);
   assert.match(xml, /k='source' v='survey'/);
-  assert.match(xml, /k='created_by' v='Level0 Reborn v0\.1\.0'/);
+  assert.match(xml, new RegExp(`k='created_by' v='${GENERATOR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'`));
 });
 
 test("uploadChanges performs create, upload and close in order", async () => {

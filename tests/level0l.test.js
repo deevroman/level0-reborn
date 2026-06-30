@@ -9,6 +9,7 @@ import {
   parseLevel0L,
   renumberDataForSandbox
 } from "../src/js/level0l.js";
+import { GENERATOR } from "../src/js/config.js";
 
 test("parseLevel0L parses nodes, ways and relations without validation errors", () => {
   const source = [
@@ -86,7 +87,7 @@ test("createOsm serializes upload-ready XML", () => {
   ]);
 
   assert.match(xml, /^<\?xml version='1\.0' encoding='UTF-8'\?>/);
-  assert.match(xml, /<osm version='0\.6' upload='true' generator='Level0 Reborn v0\.1\.0'>/);
+  assert.match(xml, new RegExp(`<osm version='0\\.6' upload='true' generator='${GENERATOR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'>`));
   assert.match(xml, /<node id='123' version='2' lat='51\.12' lon='21\.34' action='modify' timestamp='TODAY'>/);
   assert.match(xml, /<tag k='building' v='yes' \/>/);
   assert.match(xml, /<tag k='key' v='value' \/>/);

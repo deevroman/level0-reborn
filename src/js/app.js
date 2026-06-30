@@ -44,7 +44,7 @@ import {
   normalizeServerConfig,
   saveServerConfig
 } from "./server-config.js";
-import { splitUploadDataIntoGroups } from "./upload-split.js";
+import { buildUploadSplitPlan } from "./upload-split.js";
 import { uploadChanges } from "./upload.js";
 import { parseMapViewReference, removeQueryParameter } from "./url.js";
 import { countLiteralOccurrences, replaceAllLiteral } from "./search-replace.js";
@@ -934,11 +934,23 @@ function bindUploadControl(
         throw new Error("Please enter changeset comment.");
       }
 
+      const splitPlan = buildUploadSplitPlan(uploadData, state.baseData, {
+        maxGroups: 4,
+        minSplitSizeKm: 10
+      });
+      const confirmed = await requestSplitUploadConfirmation(splitPlan);
+
+      if (!confirmed) {
+        state.mapController?.clearSplitPreview();
+        setStatus(statusElement, "Split upload cancelled.");
+        return;
+      }
+
       const result = await uploadPreparedDataInGroups(
         uploadData,
+        splitPlan.groups,
         commentInput.value,
         state.serverConfig,
-        state.baseData,
         statusElement,
         urlInput,
         osmDataField,
@@ -976,6 +988,8 @@ function bindUploadControl(
       }
     } catch (error) {
       setStatus(statusElement, error.message, "error");
+    } finally {
+      state.mapController?.clearSplitPreview();
     }
   });
 }
@@ -992,19 +1006,15 @@ async function uploadPreparedDataOnce(uploadData, comment, serverConfig, statusE
 
 async function uploadPreparedDataInGroups(
   uploadData,
+  groups,
   comment,
   serverConfig,
-  baseData,
   statusElement,
   urlInput,
   osmDataField,
   level0lField,
   commentHistoryElement
 ) {
-  const groups = splitUploadDataIntoGroups(uploadData, baseData, {
-    maxGroups: 4,
-    minSplitSizeKm: 10
-  });
   const changesetIds = [];
   let workingData = uploadData;
 
@@ -1036,6 +1046,106 @@ async function uploadPreparedDataInGroups(
   return {
     changesetIds
   };
+}
+
+function renderSplitPlanSummary(splitPlan) {
+  const totalObjects = splitPlan.groupSummaries.reduce((sum, group) => sum + group.objectCount, 0);
+  const groupCount = splitPlan.groupSummaries.length;
+
+  return {
+    summary: groupCount > 1
+      ? `This upload will be split into ${groupCount} changeset(s) with ${totalObjects} object(s).`
+      : `This upload will be sent as one changeset with ${totalObjects} object(s).`,
+    items: splitPlan.groupSummaries.map((group, index) => ({
+      index: index + 1,
+      objectCount: group.objectCount,
+      bbox: group.bbox
+    }))
+  };
+}
+
+function formatSplitBbox(bbox) {
+  if (!bbox) {
+    return "bbox unavailable";
+  }
+
+  const format = (value) => Number(value).toFixed(5);
+  return `${format(bbox.minLat)}, ${format(bbox.minLon)} → ${format(bbox.maxLat)}, ${format(bbox.maxLon)}`;
+}
+
+function requestSplitUploadConfirmation(splitPlan) {
+  const dialog = document.querySelector("#split-preview-dialog");
+  const summaryElement = document.querySelector("#split-preview-summary");
+  const listElement = document.querySelector("#split-preview-list");
+  const closeButton = document.querySelector("#split-preview-close");
+  const cancelButton = document.querySelector("#split-preview-cancel");
+  const confirmButton = document.querySelector("#split-preview-confirm");
+
+  if (!dialog || !summaryElement || !listElement || !closeButton || !cancelButton || !confirmButton) {
+    return Promise.resolve(window.confirm("Upload split changesets?"));
+  }
+
+  const preview = renderSplitPlanSummary(splitPlan);
+  summaryElement.textContent = preview.summary;
+  listElement.replaceChildren(
+    ...preview.items.map((item) => {
+      const li = document.createElement("li");
+      li.textContent = `Part ${item.index}: ${item.objectCount} object(s), ${formatSplitBbox(item.bbox)}`;
+      return li;
+    })
+  );
+
+  state.mapController?.renderSplitPreview(preview.items.map((item) => item.bbox));
+
+  return new Promise((resolve) => {
+    let settled = false;
+
+    const cleanup = (confirmed) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      dialog.removeEventListener("close", onClose);
+      dialog.removeEventListener("cancel", onCancel);
+      closeButton.removeEventListener("click", onCancelClick);
+      cancelButton.removeEventListener("click", onCancelClick);
+      confirmButton.removeEventListener("click", onConfirmClick);
+      state.mapController?.clearSplitPreview();
+      resolve(confirmed);
+    };
+
+    const onConfirmClick = () => {
+      dialog.close?.("confirm");
+      cleanup(true);
+    };
+
+    const onCancelClick = () => {
+      dialog.close?.("cancel");
+      cleanup(false);
+    };
+
+    const onClose = () => {
+      cleanup(dialog.returnValue === "confirm");
+    };
+
+    const onCancel = () => {
+      cleanup(false);
+    };
+
+    dialog.addEventListener("close", onClose, { once: true });
+    dialog.addEventListener("cancel", onCancel, { once: true });
+    closeButton.addEventListener("click", onCancelClick, { once: true });
+    cancelButton.addEventListener("click", onCancelClick, { once: true });
+    confirmButton.addEventListener("click", onConfirmClick, { once: true });
+
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+      return;
+    }
+
+    dialog.setAttribute("open", "");
+  });
 }
 
 function logSplitProgress(step, totalSteps, group, changesetId) {
