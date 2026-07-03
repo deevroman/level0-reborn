@@ -935,7 +935,7 @@ function bindUploadControl(
       }
 
       const splitPlan = buildUploadSplitPlan(uploadData, state.baseData, {
-        maxGroups: 4,
+        maxGroups: 6,
         minSplitSizeKm: 10
       });
       const confirmed = await requestSplitUploadConfirmation(splitPlan);

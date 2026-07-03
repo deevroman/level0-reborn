@@ -1,5 +1,5 @@
 const KM_PER_DEGREE_LAT = 111.32;
-const DEFAULT_MAX_SPLITS = 4;
+const DEFAULT_MAX_SPLITS = 6;
 const DEFAULT_MIN_SPLIT_SIZE_KM = 10;
 
 function logSplit(message, details) {
