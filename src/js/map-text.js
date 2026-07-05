@@ -10,17 +10,25 @@ export function getSelectionRow(text, selectionStart) {
   return text.slice(0, selectionStart).split("\n").length - 1;
 }
 
-export function findNodeCoords(lines, id) {
+/**
+ * @param lines
+ * @return {Map<Number, [Number, Number]>}
+ */
+export function initNodesCoordsMap(lines) {
   const nodeLineRe = /^!?-?node\s+(-?\d+)(?:\.\d+)?\s*:\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*(?:#.*)?$/;
+  const index = new Map()
 
   for (const line of lines) {
     const match = nodeLineRe.exec(line);
-    if (match && match[1] === String(id)) {
-      return [Number(match[2]), Number(match[3])];
+    if (match) {
+      if (index.has(match[1])) {
+        alert(`detected duplicated definition for node ${match[1]}` )
+      } else {
+        index.set(Number(match[1]), [Number(match[2]), Number(match[3])])
+      }
     }
   }
-
-  return false;
+  return index
 }
 
 export function findHeaderRow(lines, row) {
@@ -35,7 +43,7 @@ export function parseHeader(line) {
   return HEADER_RE.exec(line);
 }
 
-export function collectWaySegments(lines, headerRow, highlight = false) {
+export function collectWaySegments(lines, nodesIndex, headerRow, highlight = false) {
   let wayRow = headerRow + 1;
   let nodes = [];
   const segments = [];
@@ -48,7 +56,7 @@ export function collectWaySegments(lines, headerRow, highlight = false) {
       continue;
     }
 
-    const coords = findNodeCoords(lines, match[1]);
+    const coords = nodesIndex.get(Number(match[1]));
     if (coords) {
       nodes.push(coords);
       continue;
@@ -75,6 +83,7 @@ export function collectWaySegments(lines, headerRow, highlight = false) {
 
 export function collectVisibleMapGeometry(text) {
   const lines = splitLines(text);
+  const nodesIndex = initNodesCoordsMap(lines)
   const points = [];
   const segments = [];
 
@@ -113,7 +122,7 @@ export function collectVisibleMapGeometry(text) {
 
     if (header[1] === "way") {
       segments.push(
-        ...collectWaySegments(lines, row).map((segment) => segment.coords)
+        ...collectWaySegments(lines, nodesIndex, row).map((segment) => segment.coords)
       );
     }
   }
@@ -123,6 +132,7 @@ export function collectVisibleMapGeometry(text) {
 
 export function locateSelectionGeometry(text, selectionStart, memberObjectRow = undefined, highlight = false) {
   const lines = splitLines(text);
+  const nodesIndex = initNodesCoordsMap(lines)
   const selectionRow = getSelectionRow(text, selectionStart);
   let row = memberObjectRow === undefined ? selectionRow : memberObjectRow;
 
@@ -171,14 +181,14 @@ export function locateSelectionGeometry(text, selectionStart, memberObjectRow = 
       return { center: null, segments: [] };
     }
 
-    const center = findNodeCoords(lines, selectedNodeMatch[1]);
+    const center = nodesIndex.get(Number(selectedNodeMatch[1]));
     if (!center) {
       return { center: null, segments: [] };
     }
 
     return {
       center,
-      segments: collectWaySegments(lines, headerRow, highlight)
+      segments: collectWaySegments(lines, nodesIndex, headerRow, highlight)
     };
   }
 

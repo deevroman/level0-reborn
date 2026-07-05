@@ -5,7 +5,7 @@ import {
   applyCoordsToSelection,
   collectVisibleMapGeometry,
   collectWaySegments,
-  findNodeCoords,
+  initNodesCoordsMap,
   locateSelectionGeometry,
   splitLines
 } from "../src/js/map-text.js";
@@ -15,9 +15,10 @@ test("findNodeCoords finds coordinates by node id", () => {
     "node 10: 55.75, 37.61",
     "node 11: 55.76, 37.62"
   ].join("\n"));
+  const nodesIndex = initNodesCoordsMap(lines)
 
-  assert.deepEqual(findNodeCoords(lines, 11), [55.76, 37.62]);
-  assert.equal(findNodeCoords(lines, 99), false);
+  assert.deepEqual(nodesIndex.get(11), [55.76, 37.62]);
+  assert.equal(nodesIndex.get(99), undefined);
 });
 
 test("collectWaySegments builds polyline segments from referenced nodes", () => {
@@ -29,8 +30,9 @@ test("collectWaySegments builds polyline segments from referenced nodes", () => 
     "node 10: 55.75, 37.61",
     "node 11: 55.76, 37.62"
   ].join("\n"));
+  const nodesIndex = initNodesCoordsMap(lines)
 
-  assert.deepEqual(collectWaySegments(lines, 0, true), [
+  assert.deepEqual(collectWaySegments(lines, nodesIndex, 0, true), [
     {
       coords: [[55.75, 37.61], [55.76, 37.62]],
       color: "#f30"
