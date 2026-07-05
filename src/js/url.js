@@ -7,9 +7,9 @@ import {
 import { getDefaultServerConfig } from "./server-config.js";
 
 const OVERPASS_HTTPS_HOSTS = [
-  "overpass.private.coffee/api",
-  "overpass.osm.jp/api",
-  "maps.mail.ru/osm/tools/overpass/api"
+  "overpass-api.de/api",
+  "maps.mail.ru/osm/tools/overpass/api",
+  "overpass.private.coffee/api"
 ];
 
 function normalizeCommaSeparatedInput(input) {

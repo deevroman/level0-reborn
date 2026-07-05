@@ -70,8 +70,8 @@ test("urlToApiRequests supports object lists, full-object markers and bbox URLs"
 
 test("urlToApiRequests supports known overpass interpreter URLs", () => {
   assert.equal(
-    urlToApiRequests("overpass-api.de/api/interpreter?data=a-long-query", DEV_SERVER),
-    "http://overpass-api.de/api/interpreter?data=a-long-query"
+    urlToApiRequests("https://overpass-api.de/api/interpreter?data=a-long-query", DEV_SERVER),
+    "https://overpass-api.de/api/interpreter?data=a-long-query"
   );
 
   assert.equal(
