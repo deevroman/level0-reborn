@@ -136,17 +136,20 @@ test("search and replace fields are stored", () => {
   try {
     assert.deepEqual(loadSearchReplaceState(), {
       searchValue: "",
-      replaceValue: ""
+      replaceValue: "",
+      regexEnabled: false
     });
 
     saveSearchReplaceState({
       searchValue: "old ref",
-      replaceValue: "new ref"
+      replaceValue: "new ref",
+      regexEnabled: true
     });
 
     assert.deepEqual(loadSearchReplaceState(), {
       searchValue: "old ref",
-      replaceValue: "new ref"
+      replaceValue: "new ref",
+      regexEnabled: true
     });
   } finally {
     globalThis.localStorage = originalLocalStorage;

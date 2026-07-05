@@ -527,7 +527,7 @@
       font-size: 0.92rem;
     }
 
-    .search-replace-grid input {
+    .search-replace-grid input[type="text"] {
       width: 100%;
       min-width: 0;
       padding: 4px 6px;
@@ -535,9 +535,23 @@
       background: var(--control-bg);
     }
 
+    .search-replace-checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .search-replace-checkbox input {
+      margin: 0;
+    }
+
     .search-replace-count {
       margin: 0;
       font-size: 0.92rem;
+    }
+
+    .search-replace-count[data-type="error"] {
+      color: var(--error);
     }
 
     .server-settings-grid {
@@ -865,6 +879,13 @@
             <label>
               Replace with
               <input type="text" id="search-replace-replace" autocomplete="off" spellcheck="false">
+            </label>
+            <label>
+              Mode
+              <span class="search-replace-checkbox">
+                <input type="checkbox" id="search-replace-regex">
+                Regular expression
+              </span>
             </label>
           </div>
           <p id="search-replace-count" class="search-replace-count">Potential replacements: 0</p>

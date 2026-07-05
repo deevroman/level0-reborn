@@ -60,19 +60,22 @@ export function loadSearchReplaceState() {
     if (!raw) {
       return {
         searchValue: "",
-        replaceValue: ""
+        replaceValue: "",
+        regexEnabled: false
       };
     }
 
     const parsed = JSON.parse(raw);
     return {
       searchValue: typeof parsed.searchValue === "string" ? parsed.searchValue : "",
-      replaceValue: typeof parsed.replaceValue === "string" ? parsed.replaceValue : ""
+      replaceValue: typeof parsed.replaceValue === "string" ? parsed.replaceValue : "",
+      regexEnabled: parsed.regexEnabled === true
     };
   } catch {
     return {
       searchValue: "",
-      replaceValue: ""
+      replaceValue: "",
+      regexEnabled: false
     };
   }
 }
@@ -80,7 +83,8 @@ export function loadSearchReplaceState() {
 export function saveSearchReplaceState(searchReplaceState) {
   localStorage.setItem(SEARCH_REPLACE_STATE_KEY, JSON.stringify({
     searchValue: searchReplaceState.searchValue ?? "",
-    replaceValue: searchReplaceState.replaceValue ?? ""
+    replaceValue: searchReplaceState.replaceValue ?? "",
+    regexEnabled: searchReplaceState.regexEnabled === true
   }));
 }
 

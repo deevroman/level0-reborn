@@ -47,7 +47,12 @@ import {
 import { buildUploadSplitPlan } from "./upload-split.js";
 import { uploadChanges } from "./upload.js";
 import { parseMapViewReference, removeQueryParameter } from "./url.js";
-import { countLiteralOccurrences, replaceAllLiteral } from "./search-replace.js";
+import {
+  countLineRegexOccurrences,
+  countLiteralOccurrences,
+  replaceAllLineRegex,
+  replaceAllLiteral
+} from "./search-replace.js";
 
 const THEME_STORAGE_KEY = "theme_preference_v1";
 
@@ -319,20 +324,34 @@ function persistWorkspaceState(urlInput, osmDataField, level0lField) {
   });
 }
 
-function updateSearchReplaceCount(countElement, level0lField, searchInput) {
-  const count = countLiteralOccurrences(level0lField.value, searchInput.value);
+function updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox) {
+  const regexEnabled = regexCheckbox?.checked === true;
+  let count = 0;
+
+  try {
+    count = regexEnabled
+      ? countLineRegexOccurrences(level0lField.value, searchInput.value)
+      : countLiteralOccurrences(level0lField.value, searchInput.value);
+    countElement.dataset.type = "info";
+  } catch {
+    countElement.dataset.type = "error";
+    countElement.textContent = "Invalid regular expression.";
+    return count;
+  }
+
   countElement.textContent = `Potential replacements: ${count}`;
   return count;
 }
 
-function persistSearchReplaceState(searchInput, replaceInput) {
+function persistSearchReplaceState(searchInput, replaceInput, regexCheckbox) {
   saveSearchReplaceState({
     searchValue: searchInput.value,
-    replaceValue: replaceInput.value
+    replaceValue: replaceInput.value,
+    regexEnabled: regexCheckbox?.checked === true
   });
 }
 
-function openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement) {
+function openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement, regexCheckbox) {
   const selectedText = level0lField.value.slice(level0lField.selectionStart ?? 0, level0lField.selectionEnd ?? 0);
   if (selectedText.length > 0) {
     searchInput.value = selectedText;
@@ -341,7 +360,7 @@ function openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField
   panelWrap.hidden = false;
   panelWrap.classList.add("open");
   openButton?.setAttribute("aria-expanded", "true");
-  updateSearchReplaceCount(countElement, level0lField, searchInput);
+  updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox);
   searchInput.focus();
   searchInput.select();
 }
@@ -1180,6 +1199,7 @@ function bindSearchReplaceControl(
   closeButton,
   searchInput,
   replaceInput,
+  regexCheckbox,
   countElement,
   applyButton,
   level0lField,
@@ -1190,17 +1210,18 @@ function bindSearchReplaceControl(
   oscSectionElement,
   oscPreviewElement
 ) {
-  const refreshCount = () => updateSearchReplaceCount(countElement, level0lField, searchInput);
+  const refreshCount = () => updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox);
   const persistedSearchReplaceState = loadSearchReplaceState();
 
   searchInput.value = persistedSearchReplaceState.searchValue;
   replaceInput.value = persistedSearchReplaceState.replaceValue;
+  regexCheckbox.checked = persistedSearchReplaceState.regexEnabled;
 
   openButton.setAttribute("aria-expanded", "false");
 
   openButton.addEventListener("click", () => {
-    openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement);
-    persistSearchReplaceState(searchInput, replaceInput);
+    openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement, regexCheckbox);
+    persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
   });
 
   closeButton.addEventListener("click", () => {
@@ -1212,11 +1233,15 @@ function bindSearchReplaceControl(
   });
 
   searchInput.addEventListener("input", () => {
-    persistSearchReplaceState(searchInput, replaceInput);
+    persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
     refreshCount();
   });
   replaceInput.addEventListener("input", () => {
-    persistSearchReplaceState(searchInput, replaceInput);
+    persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
+    refreshCount();
+  });
+  regexCheckbox.addEventListener("change", () => {
+    persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
     refreshCount();
   });
   level0lField.addEventListener("input", refreshCount);
@@ -1228,14 +1253,28 @@ function bindSearchReplaceControl(
       return;
     }
 
-    const occurrences = countLiteralOccurrences(level0lField.value, search);
+    const regexEnabled = regexCheckbox.checked;
+    let occurrences = 0;
+
+    try {
+      occurrences = regexEnabled
+        ? countLineRegexOccurrences(level0lField.value, search)
+        : countLiteralOccurrences(level0lField.value, search);
+    } catch (error) {
+      setStatus(statusElement, error.message, "error");
+      refreshCount();
+      return;
+    }
+
     if (occurrences === 0) {
       setStatus(statusElement, "No matches found.");
       refreshCount();
       return;
     }
 
-    level0lField.value = replaceAllLiteral(level0lField.value, search, replaceInput.value);
+    level0lField.value = regexEnabled
+      ? replaceAllLineRegex(level0lField.value, search, replaceInput.value)
+      : replaceAllLiteral(level0lField.value, search, replaceInput.value);
     state.mapController?.refreshFromText();
     state.oscPreview = "";
     renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
@@ -1269,6 +1308,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const searchReplaceCloseButton = document.querySelector("#search-replace-close");
   const searchReplaceSearchInput = document.querySelector("#search-replace-search");
   const searchReplaceReplaceInput = document.querySelector("#search-replace-replace");
+  const searchReplaceRegexCheckbox = document.querySelector("#search-replace-regex");
   const searchReplaceCount = document.querySelector("#search-replace-count");
   const searchReplaceApplyButton = document.querySelector("#search-replace-apply");
   const commentHistoryElement = document.querySelector("#comment-history");
@@ -1362,6 +1402,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     searchReplaceCloseButton,
     searchReplaceSearchInput,
     searchReplaceReplaceInput,
+    searchReplaceRegexCheckbox,
     searchReplaceCount,
     searchReplaceApplyButton,
     level0lField,
