@@ -6,13 +6,6 @@ import {
 } from "./config.js";
 import { getDefaultServerConfig } from "./server-config.js";
 
-const OVERPASS_HTTP_HOSTS = [
-  "overpass.osm.rambler.ru/cgi",
-  "overpass-api.de/api",
-  "api.openstreetmap.fr/oapi",
-  "overpass.openstreetmap.ie/api"
-];
-
 const OVERPASS_HTTPS_HOSTS = [
   "overpass.private.coffee/api",
   "overpass.osm.jp/api",
@@ -94,11 +87,6 @@ function buildMapBboxUrl(osmServer, lat, lon, zoom = MAP_DOWNLOAD_BASE_ZOOM) {
 
 function findOverpassMatch(url) {
   const normalized = url.replace(/^https?:\/\//, "");
-  const httpHost = OVERPASS_HTTP_HOSTS.find((host) => normalized.startsWith(`${host}/interpreter?data=`));
-  if (httpHost) {
-    return `http://${normalized}`;
-  }
-
   const httpsHost = OVERPASS_HTTPS_HOSTS.find((host) => normalized.startsWith(`${host}/interpreter?data=`));
   if (httpsHost) {
     return `https://${normalized}`;
