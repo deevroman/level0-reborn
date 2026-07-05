@@ -261,7 +261,11 @@ export function initMapEditor({
   textarea.addEventListener("click", () => {
     drawSelection();
   });
-  textarea.addEventListener("keyup", () => {
+  textarea.addEventListener("keyup", (event) => {
+    if (event.key?.startsWith("Arrow")) {
+      return;
+    }
+
     drawLoadedObjects();
     drawSelection();
   });
