@@ -13,6 +13,7 @@ import {
 import {
   clearCommentDraft,
   clearWorkspaceState,
+  ensureDraftStorageReady,
   loadCommentHistory,
   loadCommentDraft,
   loadSearchReplaceState,
@@ -1394,6 +1395,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   applyThemePreference(loadThemePreference());
   renderServerInfo();
+  await ensureDraftStorageReady();
   renderServerSettings(serverFormElements, state.serverConfig);
   renderThemeSettings(serverFormElements.themeSelect);
   syncCommentDraft(commentInput);
