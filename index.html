@@ -323,6 +323,28 @@
       color: var(--text);
     }
 
+    .split-preview-controls {
+      display: grid;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .split-preview-control {
+      display: grid;
+      grid-template-columns: 160px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      font-size: 0.95rem;
+    }
+
+    .split-preview-control input[type="number"] {
+      width: 100%;
+      min-width: 0;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      background: var(--control-bg);
+    }
+
     .split-preview-actions {
       display: flex;
       gap: 8px;
@@ -833,6 +855,12 @@
     <div class="project-dialog-header">
       <h3 id="split-preview-title">Upload split preview</h3>
       <button id="split-preview-close" class="project-dialog-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="split-preview-controls">
+      <label class="split-preview-control" for="split-preview-max-groups">
+        <span>Maximum parts</span>
+        <input type="number" id="split-preview-max-groups" min="1" max="10" step="1" value="6">
+      </label>
     </div>
     <p id="split-preview-summary"></p>
     <ul id="split-preview-list" class="split-preview-list"></ul>

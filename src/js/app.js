@@ -953,13 +953,9 @@ function bindUploadControl(
         throw new Error("Please enter changeset comment.");
       }
 
-      const splitPlan = buildUploadSplitPlan(uploadData, state.baseData, {
-        maxGroups: 6,
-        minSplitSizeKm: 10
-      });
-      const confirmed = await requestSplitUploadConfirmation(splitPlan);
+      const splitPlan = await requestSplitUploadConfirmation(uploadData, state.baseData);
 
-      if (!confirmed) {
+      if (!splitPlan) {
         state.mapController?.clearSplitPreview();
         setStatus(statusElement, "Split upload cancelled.");
         return;
@@ -1092,29 +1088,61 @@ function formatSplitBbox(bbox) {
   return `${format(bbox.minLat)}, ${format(bbox.minLon)} → ${format(bbox.maxLat)}, ${format(bbox.maxLon)}`;
 }
 
-function requestSplitUploadConfirmation(splitPlan) {
+function clampSplitGroupLimit(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 6;
+  }
+
+  return Math.min(10, Math.max(1, Math.trunc(numericValue)));
+}
+
+function requestSplitUploadConfirmation(uploadData, baseData) {
   const dialog = document.querySelector("#split-preview-dialog");
   const summaryElement = document.querySelector("#split-preview-summary");
   const listElement = document.querySelector("#split-preview-list");
   const closeButton = document.querySelector("#split-preview-close");
   const cancelButton = document.querySelector("#split-preview-cancel");
   const confirmButton = document.querySelector("#split-preview-confirm");
+  const maxGroupsInput = document.querySelector("#split-preview-max-groups");
 
-  if (!dialog || !summaryElement || !listElement || !closeButton || !cancelButton || !confirmButton) {
-    return Promise.resolve(window.confirm("Upload split changesets?"));
+  if (!dialog || !summaryElement || !listElement || !closeButton || !cancelButton || !confirmButton || !maxGroupsInput) {
+    return Promise.resolve(
+      window.confirm("Upload split changesets?") ? buildUploadSplitPlan(uploadData, baseData, {
+        maxGroups: 6,
+        minSplitSizeKm: 10
+      }) : null
+    );
   }
 
-  const preview = renderSplitPlanSummary(splitPlan);
-  summaryElement.textContent = preview.summary;
-  listElement.replaceChildren(
-    ...preview.items.map((item) => {
-      const li = document.createElement("li");
-      li.textContent = `Part ${item.index}: ${item.objectCount} object(s), ${formatSplitBbox(item.bbox)}`;
-      return li;
-    })
-  );
+  let currentPlan = null;
 
-  state.mapController?.renderSplitPreview(preview.items.map((item) => item.bbox));
+  const renderPlan = (splitPlan) => {
+    const preview = renderSplitPlanSummary(splitPlan);
+    summaryElement.textContent = preview.summary;
+    listElement.replaceChildren(
+      ...preview.items.map((item) => {
+        const li = document.createElement("li");
+        li.textContent = `Part ${item.index}: ${item.objectCount} object(s), ${formatSplitBbox(item.bbox)}`;
+        return li;
+      })
+    );
+
+    state.mapController?.renderSplitPreview(preview.items.map((item) => item.bbox));
+  };
+
+  const refreshPlan = () => {
+    const maxGroups = clampSplitGroupLimit(maxGroupsInput.value);
+    maxGroupsInput.value = String(maxGroups);
+    currentPlan = buildUploadSplitPlan(uploadData, baseData, {
+      maxGroups,
+      minSplitSizeKm: 10
+    });
+    renderPlan(currentPlan);
+  };
+
+  maxGroupsInput.value = String(clampSplitGroupLimit(maxGroupsInput.value));
+  refreshPlan();
 
   return new Promise((resolve) => {
     let settled = false;
@@ -1127,11 +1155,17 @@ function requestSplitUploadConfirmation(splitPlan) {
       settled = true;
       dialog.removeEventListener("close", onClose);
       dialog.removeEventListener("cancel", onCancel);
+      maxGroupsInput.removeEventListener("input", onInput);
+      maxGroupsInput.removeEventListener("change", onInput);
       closeButton.removeEventListener("click", onCancelClick);
       cancelButton.removeEventListener("click", onCancelClick);
       confirmButton.removeEventListener("click", onConfirmClick);
       state.mapController?.clearSplitPreview();
-      resolve(confirmed);
+      resolve(confirmed ? currentPlan : null);
+    };
+
+    const onInput = () => {
+      refreshPlan();
     };
 
     const onConfirmClick = () => {
@@ -1154,6 +1188,8 @@ function requestSplitUploadConfirmation(splitPlan) {
 
     dialog.addEventListener("close", onClose, { once: true });
     dialog.addEventListener("cancel", onCancel, { once: true });
+    maxGroupsInput.addEventListener("input", onInput);
+    maxGroupsInput.addEventListener("change", onInput);
     closeButton.addEventListener("click", onCancelClick, { once: true });
     cancelButton.addEventListener("click", onCancelClick, { once: true });
     confirmButton.addEventListener("click", onConfirmClick, { once: true });
