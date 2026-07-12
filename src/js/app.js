@@ -1502,6 +1502,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const { overpassUrl } = await restoreSession(loginButton);
   if (overpassUrl) {
+    clearEditorState(
+      urlInput,
+      fileInput,
+      commentInput,
+      osmDataField,
+      level0lField,
+      statusElement,
+      validationElement,
+      oscSectionElement,
+      oscPreviewElement
+    );
     setEditorLocked(level0lField, true);
     setStatus(statusElement, `Loading data from URL parameter...`);
 
