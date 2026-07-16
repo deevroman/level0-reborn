@@ -173,72 +173,55 @@ function buildGroupBbox(items) {
   return bbox;
 }
 
-function partitionItems(items, divider, axis) {
-  const left = [];
-  const right = [];
-
-  for (const item of items) {
-    if (item.center[axis] <= divider) {
-      left.push(item);
-    } else {
-      right.push(item);
-    }
-  }
-
-  return [left, right];
-}
-
 function bestSplitForAxis(items, axis) {
-  const sortedCenters = [...new Set(items.map((item) => item.center[axis]))].sort((left, right) => left - right);
-  let best = null;
+  const subAxis = axis === "lat" ? "lon" : "lat"
+  const sortedCenters = items.sort((left, right) => {
+    if (left.center[axis] < right.center[axis]) {
+      return -1
+    }
+    if (left.center[axis] > right.center[axis]) {
+      return 1
+    }
+    return left.center[subAxis] - right.center[subAxis];
+  });
 
   logSplit(`searching ${axis} split`, {
     items: items.length,
     candidates: sortedCenters.length
   });
 
-  for (let index = 0; index < sortedCenters.length - 1; index += 1) {
-    const divider = (sortedCenters[index] + sortedCenters[index + 1]) / 2;
-    const [left, right] = partitionItems(items, divider, axis);
+  let bestSplitIndex = -1
+  let bestSplitScore = 0
+  const prefixBboxes = []
+  const suffixBboxes = []
 
-    if (left.length === 0 || right.length === 0) {
-      logSplit(`skipped empty ${axis} half`, {
-        divider,
-        left: left.length,
-        right: right.length
-      });
-      continue;
-    }
+  sortedCenters.forEach(i => prefixBboxes.push(unionBbox(prefixBboxes.at(-1), i.bbox)))
+  sortedCenters.toReversed().forEach(i => suffixBboxes.push(unionBbox(suffixBboxes.at(-1), i.bbox)))
+  suffixBboxes.reverse()
 
-    const leftBbox = buildGroupBbox(left);
-    const rightBbox = buildGroupBbox(right);
+  for (let index = 1; index < sortedCenters.length - 1; index++) {
+    const leftBbox = prefixBboxes[index]
+    const rightBbox = suffixBboxes[index];
     const score = bboxAreaKm2(leftBbox) + bboxAreaKm2(rightBbox);
 
-    if (
-      !best ||
-      score < best.score ||
-      (score === best.score && Math.max(left.length, right.length) < Math.max(best.left.length, best.right.length))
-    ) {
-      best = {
-        axis,
-        divider,
-        left,
-        right,
-        score
-      };
-      logSplit(`new best ${axis} split`, {
-        divider,
-        left: left.length,
-        right: right.length,
-        score
-      });
+    if (bestSplitIndex === -1 || score < bestSplitScore) {
+      bestSplitIndex = index
+      bestSplitScore = score
     }
   }
 
-  return best;
+  return {
+    axis,
+    left: items.slice(0, bestSplitIndex),
+    right: items.slice(bestSplitIndex),
+    bestSplitScore
+  };
 }
 
 function findBestSplit(items) {
+  if (items.length < 2) {
+    return null
+  }
   const vertical = bestSplitForAxis(items, "lon");
   const horizontal = bestSplitForAxis(items, "lat");
 
