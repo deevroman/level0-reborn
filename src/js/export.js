@@ -10,6 +10,11 @@ function cloneMember(member) {
   };
 }
 
+/**
+ * @template T
+ * @param {T} object
+ * @returns {T}
+ */
 function cloneObject(object) {
   const copy = {
     ...object,
