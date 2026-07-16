@@ -8,8 +8,8 @@ const DEFAULT_CENTER = [30, 0];
 const DEFAULT_ZOOM = 2;
 const OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const ESRI_IMAGERY_TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-const OSM_ATTRIBUTION = 'Map © <a href="https://www.openstreetmap.org">OpenStreetMap contributors</a>';
-const ESRI_ATTRIBUTION = "Tiles © Esri";
+const OSM_ATTRIBUTION = '© <a href="https://www.openstreetmap.org">OpenStreetMap contributors</a>';
+const ESRI_ATTRIBUTION = "Imagery © Esri";
 
 export function buildMapAreaReference(lat, lon, zoom) {
   return `map=${Math.round(zoom)}/${lat}/${lon}`;

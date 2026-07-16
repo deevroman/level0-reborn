@@ -1133,6 +1133,9 @@ function requestSplitUploadConfirmation(uploadData, baseData) {
   };
 
   const refreshPlan = () => {
+    if (!maxGroupsInput.value) {
+      return
+    }
     const maxGroups = clampSplitGroupLimit(maxGroupsInput.value);
     maxGroupsInput.value = String(maxGroups);
     currentPlan = buildUploadSplitPlan(uploadData, baseData, {
