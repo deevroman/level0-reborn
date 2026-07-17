@@ -61,7 +61,7 @@ const state = {
   baseData: [],
   oscPreview: "",
   mapController: null,
-  serverConfig: normalizeServerConfig(BUILTIN_SERVER_PRESETS["osm-dev"])
+  serverConfig: normalizeServerConfig(BUILTIN_SERVER_PRESETS["osm"])
 };
 
 function loadThemePreference() {

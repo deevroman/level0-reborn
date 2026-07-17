@@ -41,7 +41,7 @@ export const BUILTIN_SERVER_PRESETS = {
   }
 };
 
-export const DEFAULT_SERVER_PRESET_ID = "osm-dev";
+export const DEFAULT_SERVER_PRESET_ID = "osm";
 
 function trimTrailingSlash(value) {
   return value.replace(/\/+$/, "");
