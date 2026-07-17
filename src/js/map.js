@@ -15,8 +15,99 @@ export function buildMapAreaReference(lat, lon, zoom) {
   return `map=${Math.round(zoom)}/${lat}/${lon}`;
 }
 
+export function computeVisibleGeometryBbox(geometry) {
+  let bbox = null;
+
+  function extend(coords) {
+    if (!Array.isArray(coords) || coords.length < 2) {
+      return;
+    }
+
+    const [lat, lon] = coords;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return;
+    }
+
+    if (!bbox) {
+      bbox = { minLat: lat, minLon: lon, maxLat: lat, maxLon: lon };
+      return;
+    }
+
+    bbox.minLat = Math.min(bbox.minLat, lat);
+    bbox.minLon = Math.min(bbox.minLon, lon);
+    bbox.maxLat = Math.max(bbox.maxLat, lat);
+    bbox.maxLon = Math.max(bbox.maxLon, lon);
+  }
+
+  for (const point of geometry.points ?? []) {
+    extend(point.coords);
+  }
+
+  for (const segment of geometry.segments ?? []) {
+    for (const coords of segment) {
+      extend(coords);
+    }
+  }
+
+  return bbox;
+}
+
 function getLeaflet() {
   return window.L;
+}
+
+function createGeometryBoundsControl(leaflet, onClick) {
+  let button = null;
+
+  const Control = leaflet.Control.extend({
+    options: {
+      position: "topleft"
+    },
+    onAdd() {
+      const container = leaflet.DomUtil.create("div", "leaflet-bar");
+      button = leaflet.DomUtil.create("a", "leaflet-control-zoom-to-geometry leaflet-disabled", container);
+      button.href = "#";
+      button.title = "Zoom to visible geometry";
+      button.setAttribute("role", "button");
+      button.setAttribute("aria-label", "Zoom to visible geometry");
+      button.setAttribute("aria-disabled", "true");
+      button.innerHTML =
+        '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">\n' +
+        '  <path d="M3 7V3H7" stroke-width="2" stroke-linecap="round"/>\n' +
+        '  <path d="M17 3H21V7" stroke-width="2" stroke-linecap="round"/>\n' +
+        '  <path d="M21 17V21H17" stroke-width="2" stroke-linecap="round"/>\n' +
+        '  <path d="M7 21H3V17" stroke-width="2" stroke-linecap="round"/>\n' +
+        "</svg>"
+
+      leaflet.DomEvent.disableClickPropagation(container);
+      leaflet.DomEvent.disableScrollPropagation(container);
+      leaflet.DomEvent.on(button, "click", (event) => {
+        leaflet.DomEvent.stop(event);
+        if (button.classList.contains("leaflet-disabled")) {
+          return;
+        }
+        onClick();
+      });
+
+      return container;
+    }
+  });
+
+  return {
+    addTo(map) {
+      const control = new Control();
+      control.addTo(map);
+      return this;
+    },
+    setDisabled(disabled) {
+      if (!button) {
+        return;
+      }
+
+      button.classList.toggle("leaflet-disabled", disabled);
+      button.setAttribute("aria-disabled", disabled ? "true" : "false");
+    }
+  };
 }
 
 function createRestoreViewMixin(leaflet) {
@@ -106,6 +197,23 @@ export function initMapEditor({
   const splitPreviewState = {
     view: null
   };
+  let visibleGeometryBbox = null;
+
+  const geometryBoundsControl = createGeometryBoundsControl(leaflet, () => {
+    if (!visibleGeometryBbox) {
+      return;
+    }
+
+    const bounds = leaflet.latLngBounds(
+      [visibleGeometryBbox.minLat, visibleGeometryBbox.minLon],
+      [visibleGeometryBbox.maxLat, visibleGeometryBbox.maxLon]
+    );
+    map.fitBounds(bounds.pad(0.08), { maxZoom: 18 });
+  }).addTo(map);
+
+  function updateGeometryBoundsControl() {
+    geometryBoundsControl.setDisabled(!visibleGeometryBbox);
+  }
 
   function checkZoom() {
     downareaButton.disabled = map.getZoom() < 15;
@@ -138,6 +246,9 @@ export function initMapEditor({
     objectNodes.clearLayers();
 
     const geometry = collectVisibleMapGeometry(textarea.value);
+    visibleGeometryBbox = computeVisibleGeometryBbox(geometry);
+    updateGeometryBoundsControl();
+
     for (const point of geometry.points) {
       objectNodes.addLayer(leaflet.circleMarker(point.coords, {
         radius: point.tagged ? 3 : 1,
