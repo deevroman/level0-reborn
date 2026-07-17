@@ -4,11 +4,11 @@ const DEFAULT_MIN_SPLIT_SIZE_KM = 10;
 
 function logSplit(message, details) {
   if (details === undefined) {
-    console.log(`[upload-split] ${message}`);
+    console.debug(`[upload-split] ${message}`);
     return;
   }
 
-  console.log(`[upload-split] ${message}`, details);
+  console.debug(`[upload-split] ${message}`, details);
 }
 
 function buildObjectKey(object) {
@@ -183,11 +183,6 @@ function bestSplitForAxis(items, axis) {
       return 1
     }
     return left.center[subAxis] - right.center[subAxis];
-  });
-
-  logSplit(`searching ${axis} split`, {
-    items: items.length,
-    candidates: sortedCenters.length
   });
 
   let bestSplitIndex = -1
