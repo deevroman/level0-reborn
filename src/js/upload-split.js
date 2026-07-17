@@ -173,16 +173,23 @@ function buildGroupBbox(items) {
   return bbox;
 }
 
+/**
+ * @template T
+ * @template A
+ * @param {T[]} items
+ * @param {A} axis
+ * @return {{axis: A, left: T[], right: T[], score: number}}
+ */
 function bestSplitForAxis(items, axis) {
   const subAxis = axis === "lat" ? "lon" : "lat"
-  const sortedCenters = items.sort((left, right) => {
-    if (left.center[axis] < right.center[axis]) {
+  const sortedCenters = items.sort((a, b) => {
+    if (a.center[axis] < b.center[axis]) {
       return -1
     }
-    if (left.center[axis] > right.center[axis]) {
+    if (a.center[axis] > b.center[axis]) {
       return 1
     }
-    return left.center[subAxis] - right.center[subAxis];
+    return a.center[subAxis] - b.center[subAxis];
   });
 
   let bestSplitIndex = -1
@@ -194,9 +201,9 @@ function bestSplitForAxis(items, axis) {
   sortedCenters.toReversed().forEach(i => suffixBboxes.push(unionBbox(suffixBboxes.at(-1), i.bbox)))
   suffixBboxes.reverse()
 
-  for (let index = 1; index < sortedCenters.length - 1; index++) {
+  for (let index = 0; index < sortedCenters.length - 1; index++) {
     const leftBbox = prefixBboxes[index]
-    const rightBbox = suffixBboxes[index];
+    const rightBbox = suffixBboxes[index + 1];
     const score = bboxAreaKm2(leftBbox) + bboxAreaKm2(rightBbox);
 
     if (bestSplitIndex === -1 || score < bestSplitScore) {
@@ -207,12 +214,17 @@ function bestSplitForAxis(items, axis) {
 
   return {
     axis,
-    left: items.slice(0, bestSplitIndex),
-    right: items.slice(bestSplitIndex),
-    bestSplitScore
+    left: items.slice(0, bestSplitIndex + 1),
+    right: items.slice(bestSplitIndex + 1),
+    score: bestSplitScore
   };
 }
 
+/**
+ * @template T
+ * @param {T[]} items
+ * @return {{axis: string, left: T[], right: T[], score: number}|null}
+ */
 function findBestSplit(items) {
   if (items.length < 2) {
     return null
@@ -235,6 +247,13 @@ function findBestSplit(items) {
   return vertical;
 }
 
+/**
+ * @template T
+ * @param {T[]} items
+ * @param {number} remainingGroups
+ * @param {number} minSplitSizeKm
+ * @return {*[]}
+ */
 function splitItems(items, remainingGroups, minSplitSizeKm) {
   const bbox = buildGroupBbox(items);
   if (!bbox || remainingGroups <= 1 || items.length <= 1) {
@@ -281,7 +300,6 @@ function splitItems(items, remainingGroups, minSplitSizeKm) {
     items: items.length,
     remainingGroups,
     axis: bestSplit.axis,
-    divider: bestSplit.divider,
     left: bestSplit.left.length,
     right: bestSplit.right.length
   });
