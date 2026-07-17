@@ -15,6 +15,9 @@ export async function loadOverpassData(url, fetchImpl = fetch) {
 async function loadTextData(url, fetchImpl = fetch) {
   const response = await fetchImpl(url);
   if (!response.ok) {
+    if (response.status === 410) {
+      throw new Error("Deleted object")
+    }
     throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
 
@@ -97,9 +100,18 @@ export async function loadSupportedUrl(input, osmServer = getDefaultServerConfig
   if (requests) {
     const requestList = Array.isArray(requests) ? requests : [requests];
     const parts = await Promise.all(
-      requestList.map(async (url) => parseOsmXml(await loadTextData(url, fetchImpl)))
+      requestList.map(async (url) => {
+        try {
+          return parseOsmXml(await loadTextData(url, fetchImpl));
+        } catch (e) {
+          if (e.message === "Deleted object") { // todo
+            return null;
+          }
+          throw e
+        }
+      })
     );
-    const data = mergeOsmData(parts);
+    const data = mergeOsmData(parts.filter(i => i !== null));
 
     return {
       data,
