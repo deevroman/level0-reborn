@@ -4,7 +4,9 @@
 
 Demo: https://deevroman.github.io/level0-reborn
 
-⚠️ The editor is still in development and there may be problems in it. However, you can already make simple tag changes.
+⚠️ The editor is still in development, and there may be problems in it. 
+
+However, you can already make simple tag changes.
 
 ## Features
 
@@ -14,8 +16,16 @@ Demo: https://deevroman.github.io/level0-reborn
 - Display all downloaded data on map
 - Search and Replace
 - You can copy data from the main server to the OSM Sandbox ( inspired by https://github.com/Zverik/osm_to_sandbox)
+- Dark theme 
 
-- ... in progress
+... in progress
+
+- [ ] polishing the UX/UI
+- [ ] Overpass query editor
+- [ ] Custom changeset split
+- [ ] i18n
+
+p.s. Let me know if you are interested in this editor or some features
 
 ## Dev Notes
 
