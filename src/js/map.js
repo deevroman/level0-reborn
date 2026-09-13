@@ -310,34 +310,72 @@ export function initMapEditor({
       zoom: map.getZoom()
     };
 
-    const previewBounds = [];
     const colors = ["#d9480f", "#5f3dc4", "#2f9e44", "#0b7285"];
 
-    validBboxes.forEach((bbox, index) => {
-      const bounds = leaflet.latLngBounds(
+    // Fit first. Creating SVG polygons at the old zoom and then changing the
+    // view can leave Leaflet with a path projected for the previous renderer
+    // bounds.
+    const previewBounds = validBboxes.map((bbox) => (
+      leaflet.latLngBounds(
         [bbox.minLat, bbox.minLon],
         [bbox.maxLat, bbox.maxLon]
-      );
-      previewBounds.push(bounds);
-      splitPreviewLayer.addLayer(leaflet.rectangle(bounds, {
-        color: colors[index % colors.length],
-        weight: 2,
-        fillColor: colors[index % colors.length],
-        fillOpacity: 0.08,
-        dashArray: "5 4",
-        interactive: false
-      }));
-    });
-
-    const unionBounds = previewBounds.reduce((accumulator, bounds) => (
-      accumulator ? accumulator.extend(bounds) : bounds
-    ), null);
+      )
+    ));
+    let unionBounds = null;
+    for (const bounds of previewBounds) {
+      // LatLngBounds.extend() mutates its receiver. Do not use a group's own
+      // bounds as the accumulator, otherwise the first preview becomes the
+      // union of every group.
+      unionBounds = unionBounds
+        ? unionBounds.extend(bounds)
+        : leaflet.latLngBounds(bounds.getSouthWest(), bounds.getNorthEast());
+    }
 
     if (unionBounds) {
       map.fitBounds(unionBounds.pad(0.08), { animate: false });
       marker.setLatLng(map.getCenter());
       updateCoords();
     }
+
+    previewBounds.forEach((bounds, index) => {
+      const southWestPoint = map.latLngToContainerPoint(bounds.getSouthWest());
+      const northEastPoint = map.latLngToContainerPoint(bounds.getNorthEast());
+      const widthPixels = Math.abs(northEastPoint.x - southWestPoint.x);
+      const heightPixels = Math.abs(northEastPoint.y - southWestPoint.y);
+      const minimumBboxSizePixels = 4;
+      const style = {
+        color: colors[index % colors.length],
+        weight: 2,
+        fillColor: colors[index % colors.length],
+        fillOpacity: 0.08,
+        dashArray: "5 4",
+        interactive: false,
+        // Split previews have at most ten simple rectangles. Keep every
+        // corner while Leaflet recalculates their pixel geometry after fitBounds.
+        noClip: true,
+        smoothFactor: 0
+      };
+      // Coordinates in the summary are rounded. A tiny non-zero bbox can be
+      // smaller than one screen pixel at the fitted zoom and becomes a broken
+      // SVG polygon, so represent it as the geometry the user can actually see.
+      const isPoint = widthPixels < minimumBboxSizePixels && heightPixels < minimumBboxSizePixels;
+      const isLine = !isPoint && (widthPixels < minimumBboxSizePixels || heightPixels < minimumBboxSizePixels);
+
+      if (isPoint) {
+        splitPreviewLayer.addLayer(leaflet.circleMarker(bounds.getCenter(), {
+          ...style,
+          radius: 6,
+          fillOpacity: 0.35
+        }));
+      } else if (isLine) {
+        splitPreviewLayer.addLayer(leaflet.polyline([
+          bounds.getSouthWest(),
+          bounds.getNorthEast()
+        ], style));
+      } else {
+        splitPreviewLayer.addLayer(leaflet.rectangle(bounds, style));
+      }
+    });
   }
 
   map.on("moveend", checkZoom);
