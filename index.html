@@ -203,6 +203,10 @@
       visibility: hidden;
     }
 
+    #login:disabled + #logout {
+      display: none;
+    }
+
     input[type="text"] {
       min-height: var(--control-height);
       padding: 2px 4px;
@@ -466,9 +470,8 @@
       background: var(--overlay-surface);
       list-style: none;
       line-height: 1.2;
-    }
 
-    .server-settings summary {
+      white-space: pre;
       cursor: pointer;
       font-weight: 700;
     }
@@ -937,7 +940,7 @@
         </div>
       </div>
       <details class="server-settings">
-        <summary>Settings: <span id="current-server-label">OpenStreetMap Dev</span></summary>
+        <summary>Settings: <span id="current-server-label">OpenStreetMap</span></summary>
         <span class="server-settings-backdrop" aria-hidden="true"></span>
         <div class="server-settings-panel">
           <div class="server-settings-grid">
