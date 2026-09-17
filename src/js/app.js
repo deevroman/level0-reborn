@@ -1165,7 +1165,9 @@ function requestSplitUploadConfirmation(uploadData, baseData) {
     renderPlan(currentPlan);
   };
 
-  maxGroupsInput.value = String(clampSplitGroupLimit(maxGroupsInput.value));
+  const objectCount = uploadData.filter((object) => object.type !== "changeset").length;
+  const defaultMaxGroups = Math.min(6, Math.max(1, objectCount));
+  maxGroupsInput.value = String(defaultMaxGroups);
   refreshPlan();
 
   return new Promise((resolve) => {
