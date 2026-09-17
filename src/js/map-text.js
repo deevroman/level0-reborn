@@ -1,5 +1,5 @@
 export const HEADER_RE = /^!?-?(node|way|relation)(?:\s+(-?\d+))?(?:\.\d+)?(?:\s*:\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?))?\s*(?:#.*)?$/;
-export const NODE_SET_RE = /^(!?-?node(?:\s+(-?\d+))?\s*)(\s*:\s*)?(-?\d{1,2}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?)?(\s*#.*)?\s*$/;
+export const NODE_SET_RE = /^(!?-?node(?:\s+(-?\d+)(?:\.\d+)?)?\s*)(\s*:\s*)?(-?\d{1,2}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?)?(\s*#.*)?\s*$/;
 export const ND_RE = /^\s*nd\s+(-?\d+)\s*$/;
 
 export function splitLines(text) {

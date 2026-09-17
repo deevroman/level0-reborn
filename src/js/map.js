@@ -3,6 +3,7 @@ import {
   collectVisibleMapGeometry,
   locateSelectionGeometry
 } from "./map-text.js";
+import { parseMapCenterParameter } from "./url.js";
 
 const DEFAULT_CENTER = [30, 0];
 const DEFAULT_ZOOM = 2;
@@ -198,6 +199,7 @@ export function initMapEditor({
     view: null
   };
   let visibleGeometryBbox = null;
+  let preserveMapPositionOnNextSelection = false;
 
   const geometryBoundsControl = createGeometryBoundsControl(leaflet, () => {
     if (!visibleGeometryBbox) {
@@ -270,12 +272,13 @@ export function initMapEditor({
     }
   }
 
-  function drawSelection(highlight = false) {
+  function drawSelection(highlight = false, centerMap = true) {
     selectionWays.clearLayers();
     const geometry = locateSelectionGeometry(textarea.value, textarea.selectionStart, undefined, highlight);
-    if (geometry.center) {
+    if (centerMap && geometry.center && !preserveMapPositionOnNextSelection) {
       setCenter(geometry.center);
     }
+    preserveMapPositionOnNextSelection = false;
     for (const segment of geometry.segments) {
       selectionWays.addLayer(leaflet.polyline(segment.coords, {
         color: segment.color,
@@ -379,6 +382,12 @@ export function initMapEditor({
   }
 
   map.on("moveend", checkZoom);
+  map.on("dragstart", () => {
+    preserveMapPositionOnNextSelection = true;
+  });
+  marker.on("dragstart", () => {
+    preserveMapPositionOnNextSelection = true;
+  });
   marker.on("dragend", () => {
     map.panTo(marker.getLatLng());
   });
@@ -388,13 +397,32 @@ export function initMapEditor({
   });
 
   coord2textButton.disabled = false;
-  coord2textButton.addEventListener("click", () => {
+  coord2textButton.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+  });
+  function applyCoordsFromInput() {
+    const insertedCenter = parseMapCenterParameter(coordsInput.value);
     const updatedText = applyCoordsToSelection(textarea.value, textarea.selectionStart, coordsInput.value);
     const selectionStart = textarea.selectionStart;
     textarea.value = updatedText;
     textarea.setSelectionRange(selectionStart, selectionStart);
     drawLoadedObjects();
-    drawSelection();
+    if (insertedCenter) {
+      setCenter([insertedCenter.lat, insertedCenter.lon]);
+    }
+    drawSelection(false, false);
+  }
+
+  coord2textButton.addEventListener("click", () => {
+    applyCoordsFromInput();
+  });
+  coordsInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    applyCoordsFromInput();
   });
 
   downareaButton.addEventListener("click", async () => {

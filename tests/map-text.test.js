@@ -74,6 +74,13 @@ test("applyCoordsToSelection updates node header coordinates", () => {
   );
 });
 
+test("applyCoordsToSelection preserves a node version", () => {
+  assert.equal(
+    applyCoordsToSelection("node 10.3: 55.75, 37.61", 0, "55.80, 37.70"),
+    "node 10.3: 55.80, 37.70"
+  );
+});
+
 test("applyCoordsToSelection updates referenced node coordinates from a way row", () => {
   const text = [
     "way 20",
