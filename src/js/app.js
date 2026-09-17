@@ -479,6 +479,16 @@ function clearEditorState(
   clearWorkspaceState();
 }
 
+function clearLoadedEditorData(osmDataField, level0lField, validationElement, oscSectionElement, oscPreviewElement) {
+  state.baseData = [];
+  state.oscPreview = "";
+  osmDataField.value = "";
+  level0lField.value = "";
+  state.mapController?.refreshFromText();
+  renderValidation(validationElement, []);
+  renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
+}
+
 function applySandboxConversion(level0lField, validationElement, oscSectionElement, oscPreviewElement) {
   const { data } = parseEditor(level0lField);
   const convertedData = renumberDataForSandbox(data);
@@ -811,6 +821,7 @@ function bindLoadControls(addButton, replaceButton, urlInput, fileInput, osmData
     }
 
     event.preventDefault();
+    removeUrlParameterFromAddress("center");
     await loadIntoEditor(urlInput, fileInput, osmDataField, level0lField, statusElement, "add");
   });
 }
@@ -1449,6 +1460,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   const mapCenter = parseMapCenterParameter(new URLSearchParams(window.location.search).get("center"));
   if (mapCenter) {
+    clearLoadedEditorData(
+      osmDataField,
+      level0lField,
+      validationElement,
+      oscSectionElement,
+      oscPreviewElement
+    );
     const zoom = Math.max(state.mapController?.getZoom() ?? 17, 17);
     state.mapController?.setView(mapCenter.lat, mapCenter.lon, zoom);
   }
