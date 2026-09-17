@@ -1449,7 +1449,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   const mapCenter = parseMapCenterParameter(new URLSearchParams(window.location.search).get("center"));
   if (mapCenter) {
-    const zoom = Math.max(state.mapController?.getZoom() ?? 16, 16);
+    const zoom = Math.max(state.mapController?.getZoom() ?? 17, 17);
     state.mapController?.setView(mapCenter.lat, mapCenter.lon, zoom);
   }
   state.mapController?.refreshFromText();
