@@ -225,7 +225,7 @@ function setStatusWithLinks(statusElement, message, links, type = "success") {
     allA.onclick = e => {
       e.preventDefault()
       links.forEach(link => {
-        window.open(link, "_blank")
+        window.open(link.url, "_blank")
       })
     }
     nodes.push(document.createTextNode("\xA0"));
