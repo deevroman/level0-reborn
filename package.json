@@ -4,7 +4,7 @@
   "scripts": {
     "lint": "eslint src tests eslint.config.mjs",
     "test": "node --test",
-    "version:sync": "sed -i.bak -E \"s#(EDITOR_VERSION = \\\")[^\\\"]+(\\\";)#\\\\1$npm_package_version\\\\2#\" src/js/config.js && sed -i.bak -E \"s#(Level0 Reborn v)[^\\\"]+(\\\")#\\\\1$npm_package_version\\\\2#\" index.html && rm src/js/config.js.bak index.html.bak"
+    "version:sync": "sed -i.bak -E \"s#(EDITOR_VERSION = \\\")[^\\\"]+(\\\";)#\\\\1$npm_package_version\\\\2#\" src/js/config.js && sed -i.bak -E \"s#(Level0 Reborn v)[^\\\"]+(\\\")#\\\\1$npm_package_version\\\\2#\" index.html && sed -i.bak -E \"s#(Level0 Reborn v)[0-9A-Za-z.+-]+#\\\\1$npm_package_version#\" index.html && rm src/js/config.js.bak index.html.bak"
   },
   "dependencies": {
     "eslint": "9.26.0"
