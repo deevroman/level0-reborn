@@ -16,6 +16,27 @@ function normalizeCommaSeparatedInput(input) {
   return input.trim().replace(/,+/g, ",").replace(/^,+|,+$/g, "");
 }
 
+export function parseMapCenterParameter(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const match = value.trim().match(
+    /^(-?(?:\d+(?:\.\d*)?|\.\d+))\s*,\s*(-?(?:\d+(?:\.\d*)?|\.\d+))$/
+  );
+  if (!match) {
+    return null;
+  }
+
+  const lat = Number(match[1]);
+  const lon = Number(match[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+    return null;
+  }
+
+  return { lat, lon };
+}
+
 export function parseMapViewReference(input) {
   const url = normalizeCommaSeparatedInput(input);
   if (url.length === 0) {

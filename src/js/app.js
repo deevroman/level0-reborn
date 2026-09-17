@@ -47,7 +47,7 @@ import {
 } from "./server-config.js";
 import { buildUploadSplitPlan } from "./upload-split.js";
 import { uploadChanges } from "./upload.js";
-import { parseMapViewReference, removeQueryParameter } from "./url.js";
+import { parseMapCenterParameter, parseMapViewReference, removeQueryParameter } from "./url.js";
 import {
   countLineRegexOccurrences,
   countLiteralOccurrences,
@@ -1447,6 +1447,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       await loadIntoEditor(urlInput, fileInput, osmDataField, level0lField, statusElement, "replace");
     }
   });
+  const mapCenter = parseMapCenterParameter(new URLSearchParams(window.location.search).get("center"));
+  if (mapCenter) {
+    const zoom = Math.max(state.mapController?.getZoom() ?? 16, 16);
+    state.mapController?.setView(mapCenter.lat, mapCenter.lon, zoom);
+  }
   state.mapController?.refreshFromText();
 
   const storedUserName = getStoredUserName(state.serverConfig) ?? "";

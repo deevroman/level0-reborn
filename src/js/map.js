@@ -432,6 +432,9 @@ export function initMapEditor({
     setView(lat, lon, zoom) {
       setMapView(lat, lon, zoom);
     },
+    getZoom() {
+      return map.getZoom();
+    },
     getMapCenterString() {
       return getCenter(",");
     },

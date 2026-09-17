@@ -2,7 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { getPresetServerConfig } from "../src/js/server-config.js";
-import { parseMapViewReference, removeQueryParameter, urlToApiRequests } from "../src/js/url.js";
+import {
+  parseMapCenterParameter,
+  parseMapViewReference,
+  removeQueryParameter,
+  urlToApiRequests
+} from "../src/js/url.js";
 
 const DEV_SERVER = getPresetServerConfig("osm-dev");
 const OGF_SERVER = getPresetServerConfig("ogf");
@@ -97,6 +102,18 @@ test("parseMapViewReference keeps zoom lat and lon from map references", () => {
     parseMapViewReference("15/45.3222/37.3043"),
     { zoom: 15, lat: 45.3222, lon: 37.3043 }
   );
+});
+
+test("parseMapCenterParameter reads valid latitude and longitude pairs", () => {
+  assert.deepEqual(parseMapCenterParameter("55.7558,37.6173"), { lat: 55.7558, lon: 37.6173 });
+  assert.deepEqual(parseMapCenterParameter(" -90 , 180 "), { lat: -90, lon: 180 });
+});
+
+test("parseMapCenterParameter rejects malformed and out-of-range coordinates", () => {
+  assert.equal(parseMapCenterParameter("55.7558"), null);
+  assert.equal(parseMapCenterParameter("91,37.6173"), null);
+  assert.equal(parseMapCenterParameter("55.7558,181"), null);
+  assert.equal(parseMapCenterParameter("north,east"), null);
 });
 
 test("removeQueryParameter removes only the requested query parameter", () => {
