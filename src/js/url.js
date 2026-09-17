@@ -9,7 +9,9 @@ import { getDefaultServerConfig } from "./server-config.js";
 const OVERPASS_HTTPS_HOSTS = [
   "overpass-api.de/api",
   "maps.mail.ru/osm/tools/overpass/api",
-  "overpass.private.coffee/api"
+  "overpass.private.coffee/api",
+  "overpass.nextgis.com",
+  "api.fairwaymapper.com"
 ];
 
 function normalizeCommaSeparatedInput(input) {
@@ -108,7 +110,7 @@ function buildMapBboxUrl(osmServer, lat, lon, zoom = MAP_DOWNLOAD_BASE_ZOOM) {
 
 function findOverpassMatch(url) {
   const normalized = url.replace(/^https?:\/\//, "");
-  const httpsHost = OVERPASS_HTTPS_HOSTS.find((host) => normalized.startsWith(`${host}/interpreter?data=`));
+  const httpsHost = OVERPASS_HTTPS_HOSTS.find((host) => normalized.startsWith(host) && normalized.includes(`/interpreter?data=`));
   if (httpsHost) {
     return `https://${normalized}`;
   }

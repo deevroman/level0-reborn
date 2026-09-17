@@ -9,7 +9,13 @@ export async function loadOverpassData(url, fetchImpl = fetch) {
     throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
 
-  return response.json();
+  const body = await response.text();
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    return parseOsmXml(body);
+  }
 }
 
 async function loadTextData(url, fetchImpl = fetch) {

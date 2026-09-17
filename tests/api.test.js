@@ -15,6 +15,31 @@ function createXmlResponse(xml) {
   };
 }
 
+test("loadSupportedUrl falls back to OSM XML when a direct URL is not JSON", async () => {
+  const url = "https://example.test/data.osm";
+  const result = await loadSupportedUrl(url, DEV_SERVER, async (requestedUrl) => {
+    assert.equal(requestedUrl, url);
+    return createXmlResponse(`
+      <osm version="0.6">
+        <node id="1" version="2" lat="55.75" lon="37.61">
+          <tag k="name" v="Point" />
+        </node>
+      </osm>
+    `);
+  });
+
+  assert.deepEqual(result.data, [{
+    type: "node",
+    id: 1,
+    version: 2,
+    tags: { name: "Point" },
+    lat: 55.75,
+    lon: 37.61
+  }]);
+  assert.equal(result.raw, JSON.stringify(result.data, null, 2));
+  assert.deepEqual(result.requests, [url]);
+});
+
 test("loadSupportedUrl keeps incomplete relations untouched during normal loading", async () => {
   const calls = [];
   const fetchStub = async (url) => {
