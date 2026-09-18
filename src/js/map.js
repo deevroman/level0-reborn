@@ -1,5 +1,5 @@
 import {
-  applyCoordsToSelection,
+  applyCoordsToSelectionWithCursor,
   collectVisibleMapGeometry,
   locateSelectionGeometry
 } from "./map-text.js";
@@ -402,10 +402,13 @@ export function initMapEditor({
   });
   function applyCoordsFromInput() {
     const insertedCenter = parseMapCenterParameter(coordsInput.value);
-    const updatedText = applyCoordsToSelection(textarea.value, textarea.selectionStart, coordsInput.value);
-    const selectionStart = textarea.selectionStart;
-    textarea.value = updatedText;
-    textarea.setSelectionRange(selectionStart, selectionStart);
+    const updated = applyCoordsToSelectionWithCursor(
+      textarea.value,
+      textarea.selectionStart,
+      coordsInput.value
+    );
+    textarea.value = updated.text;
+    textarea.setSelectionRange(updated.selectionStart, updated.selectionStart);
     drawLoadedObjects();
     if (insertedCenter) {
       setCenter([insertedCenter.lat, insertedCenter.lon]);

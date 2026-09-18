@@ -195,44 +195,64 @@ export function locateSelectionGeometry(text, selectionStart, memberObjectRow = 
   return { center: null, segments: [] };
 }
 
-export function applyCoordsToSelection(text, selectionStart, coords) {
+function getLineStart(lines, row) {
+  let offset = 0;
+  for (let index = 0; index < row; index += 1) {
+    offset += lines[index].length + 1;
+  }
+  return offset;
+}
+
+export function applyCoordsToSelectionWithCursor(text, selectionStart, coords) {
   const lines = splitLines(text);
   const row = getSelectionRow(text, selectionStart);
   const headerRow = findHeaderRow(lines, row);
 
   if (coords === "" || row >= lines.length || headerRow < 0) {
-    return text;
+    return { text, selectionStart };
   }
 
   const header = parseHeader(lines[headerRow]);
   if (!header) {
-    return text;
+    return { text, selectionStart };
   }
 
   if (header[1] === "node") {
     const match = NODE_SET_RE.exec(lines[headerRow]);
     if (!match) {
-      return text;
+      return { text, selectionStart };
     }
 
-    lines[headerRow] = `${match[1]}${match[3] ? match[3] : ": "}${coords}${match[5] || ""}`;
-    return lines.join("\n");
+    const prefix = `${match[1]}${match[3] ? match[3] : ": "}`;
+    lines[headerRow] = `${prefix}${coords}${match[5] || ""}`;
+    return {
+      text: lines.join("\n"),
+      selectionStart: getLineStart(lines, headerRow) + prefix.length + coords.length
+    };
   }
 
   if (header[1] === "way") {
     const nodeMatch = ND_RE.exec(lines[row]);
     if (!nodeMatch) {
-      return text;
+      return { text, selectionStart };
     }
 
     for (let index = 0; index < lines.length; index += 1) {
       const nodeLineMatch = NODE_SET_RE.exec(lines[index]);
       if (nodeLineMatch && nodeLineMatch[2] === nodeMatch[1]) {
-        lines[index] = `${nodeLineMatch[1]}${nodeLineMatch[3] ? nodeLineMatch[3] : ": "}${coords}${nodeLineMatch[5] || ""}`;
-        break;
+        const prefix = `${nodeLineMatch[1]}${nodeLineMatch[3] ? nodeLineMatch[3] : ": "}`;
+        lines[index] = `${prefix}${coords}${nodeLineMatch[5] || ""}`;
+        return {
+          text: lines.join("\n"),
+          selectionStart: getLineStart(lines, index) + prefix.length + coords.length
+        };
       }
     }
   }
 
-  return lines.join("\n");
+  return { text: lines.join("\n"), selectionStart };
+}
+
+export function applyCoordsToSelection(text, selectionStart, coords) {
+  return applyCoordsToSelectionWithCursor(text, selectionStart, coords).text;
 }

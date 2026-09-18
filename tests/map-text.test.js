@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   applyCoordsToSelection,
+  applyCoordsToSelectionWithCursor,
   collectVisibleMapGeometry,
   collectWaySegments,
   initNodesCoordsMap,
@@ -79,6 +80,13 @@ test("applyCoordsToSelection preserves a node version", () => {
     applyCoordsToSelection("node 10.3: 55.75, 37.61", 0, "55.80, 37.70"),
     "node 10.3: 55.80, 37.70"
   );
+});
+
+test("applyCoordsToSelectionWithCursor places the cursor after inserted coordinates", () => {
+  const updated = applyCoordsToSelectionWithCursor("node", "node".length, "55.80, 37.70");
+
+  assert.equal(updated.text, "node: 55.80, 37.70");
+  assert.equal(updated.selectionStart, "node: 55.80, 37.70".length);
 });
 
 test("applyCoordsToSelection updates referenced node coordinates from a way row", () => {
