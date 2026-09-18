@@ -418,6 +418,11 @@
       z-index: 3000;
     }
 
+    .upload-actions {
+      display: flex;
+      gap: 10px;
+    }
+
     .toolbar-actions details {
       margin: 0;
     }
@@ -736,6 +741,17 @@
         margin: 0;
       }
 
+      .upload-actions {
+        width: 100%;
+        flex-wrap: nowrap;
+      }
+
+      .toolbar-row .upload-actions button {
+        flex: 1 1 0;
+        width: auto;
+        min-width: 0;
+      }
+
       .toolbar-row input:not([type="text"]),
       .toolbar-row select {
         width: 100%;
@@ -1016,8 +1032,10 @@
       <input type="text" id="comment-input" maxlength="255" autocomplete="off" list="comment-history">
     </label>
     <datalist id="comment-history"></datalist>
-    <button id="upload" type="button">Upload to OSM</button>
-    <button id="split-upload" type="button">Split before upload</button>
+    <div class="upload-actions">
+      <button id="upload" type="button">Upload to OSM</button>
+      <button id="split-upload" type="button">Split before upload</button>
+    </div>
   </div>
 </section>
 
