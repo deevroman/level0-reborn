@@ -203,7 +203,7 @@
       visibility: hidden;
     }
 
-    #login:disabled + #logout {
+    #login:not(:disabled) + #logout {
       display: none;
     }
 
@@ -719,12 +719,11 @@
       }
 
       .page-header {
-        flex-direction: column;
+          gap: 1px;
       }
 
       .auth-controls {
-        width: 100%;
-        justify-content: flex-start;
+          gap: 4px;
       }
 
       .toolbar-row button,
@@ -845,7 +844,7 @@
       }
 
       if (userName.length > 0) {
-        loginButton.textContent = `You're ${userName}`;
+        loginButton.textContent = userName;
         loginButton.disabled = true;
       } else if (accessToken.length > 0) {
         loginButton.disabled = true;

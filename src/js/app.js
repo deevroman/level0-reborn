@@ -95,7 +95,7 @@ function saveThemePreference(theme) {
 
 function setLoginState(loginButton, userName = "") {
   const isLoggedIn = userName.length > 0;
-  loginButton.textContent = isLoggedIn ? `You're ${userName}` : "Log in";
+  loginButton.textContent = isLoggedIn ? userName : "Log in";
   loginButton.disabled = isLoggedIn;
   loginButton.dataset.authReady = "true";
 }
