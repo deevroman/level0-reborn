@@ -11,6 +11,11 @@ const OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const ESRI_IMAGERY_TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const OSM_ATTRIBUTION = '© <a href="https://www.openstreetmap.org">OpenStreetMap contributors</a>';
 const ESRI_ATTRIBUTION = "Imagery © Esri";
+const DEFAULT_BASE_LAYER = {
+  name: "OpenStreetMap",
+  tileUrl: OSM_TILE_URL,
+  attribution: OSM_ATTRIBUTION
+};
 
 export function buildMapAreaReference(lat, lon, zoom) {
   return `map=${Math.round(zoom)}/${lat}/${lon}`;
@@ -151,12 +156,14 @@ export function initMapEditor({
   coord2textButton,
   downareaButton,
   urlInput,
+  defaultBaseLayer = DEFAULT_BASE_LAYER,
   onDownloadArea
 }) {
   const leaflet = getLeaflet();
   if (!leaflet || !mapElement) {
     return {
       refreshFromText() {},
+      setDefaultBaseLayer() {},
       getMapCenterString() {
         return "";
       }
@@ -173,21 +180,42 @@ export function initMapEditor({
     map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
   }
 
-  const osmLayer = leaflet.tileLayer(OSM_TILE_URL, {
-    attribution: OSM_ATTRIBUTION
-  }).addTo(map);
   const esriImageryLayer = leaflet.tileLayer(ESRI_IMAGERY_TILE_URL, {
     attribution: ESRI_ATTRIBUTION
   });
+  let activeBaseLayer = null;
+  let baseLayerControl = null;
 
-  leaflet.control.layers(
-    {
-      OpenStreetMap: osmLayer,
+  function createBaseLayer(baseLayer) {
+    return leaflet.tileLayer(baseLayer.tileUrl, {
+      attribution: baseLayer.attribution
+    });
+  }
+
+  function setDefaultBaseLayer(baseLayer = DEFAULT_BASE_LAYER) {
+    if (activeBaseLayer) {
+      map.removeLayer(activeBaseLayer);
+    }
+    if (baseLayerControl) {
+      map.removeControl(baseLayerControl);
+    }
+
+    activeBaseLayer = createBaseLayer(baseLayer).addTo(map);
+    const baseLayers = {
+      [baseLayer.name]: activeBaseLayer,
       "ESRI Imagery": esriImageryLayer
-    },
-    {},
-    { collapsed: true }
-  ).addTo(map);
+    };
+    if (baseLayer.tileUrl !== OSM_TILE_URL) {
+      baseLayers.OpenStreetMap = createBaseLayer(DEFAULT_BASE_LAYER);
+    }
+
+    baseLayerControl = leaflet.control.layers(baseLayers, {}, { collapsed: true }).addTo(map);
+  }
+
+  setDefaultBaseLayer(defaultBaseLayer);
+  map.on("baselayerchange", ({ layer }) => {
+    activeBaseLayer = layer;
+  });
   leaflet.control.attribution({ prefix: null }).addTo(map);
 
   const marker = leaflet.marker(map.getCenter(), { draggable: true }).addTo(map);
@@ -459,6 +487,9 @@ export function initMapEditor({
       drawLoadedObjects();
       drawSelection();
       updateCoords();
+    },
+    setDefaultBaseLayer(baseLayer) {
+      setDefaultBaseLayer(baseLayer);
     },
     setView(lat, lon, zoom) {
       setMapView(lat, lon, zoom);

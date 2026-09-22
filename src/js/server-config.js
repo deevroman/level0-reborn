@@ -3,45 +3,70 @@ const OAUTH_AUTHORIZATION_ENDPOINT = "/oauth2/authorize";
 const OAUTH_TOKEN_ENDPOINT = "/oauth2/token";
 const OAUTH_REVOKE_ENDPOINT = "/oauth2/revoke";
 
+const OSM_BASE_LAYER = {
+  name: "OpenStreetMap",
+  tileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap contributors</a>'
+};
+
+const OPEN_GEOFICTION_BASE_LAYER = {
+  name: "OpenGeofiction",
+  tileUrl: "https://tiles05.opengeofiction.net/ogf-carto/{z}/{x}/{y}.png",
+  attribution: '© <a href="https://opengeofiction.net">OpenGeofiction contributors</a>'
+};
+
 export const BUILTIN_SERVER_PRESETS = {
   osm: {
     presetId: "osm",
     name: "OpenStreetMap",
     siteUrl: "https://www.openstreetmap.org",
     apiBase: "https://api.openstreetmap.org/api/0.6/",
-    clientId: "4iG7gjwlubrNNwO0nQI-KlKf76ihN9BIzo0PMzlfkDY"
+    clientId: "4iG7gjwlubrNNwO0nQI-KlKf76ihN9BIzo0PMzlfkDY",
+    defaultBaseLayer: OSM_BASE_LAYER
   },
   "osm-dev": {
     presetId: "osm-dev",
     name: "OpenStreetMap Dev",
     siteUrl: "https://master.apis.dev.openstreetmap.org",
     apiBase: "https://master.apis.dev.openstreetmap.org/api/0.6/",
-    clientId: "HgTl3HZ4bSyD6md01peniJWFNWg4FAWzIcTcq2UJFDI"
+    clientId: "HgTl3HZ4bSyD6md01peniJWFNWg4FAWzIcTcq2UJFDI",
+    defaultBaseLayer: OSM_BASE_LAYER
   },
   ohm: {
     presetId: "ohm",
     name: "OpenHistoricalMap",
     siteUrl: "https://www.openhistoricalmap.org",
     apiBase: "https://www.openhistoricalmap.org/api/0.6/",
-    clientId: "OK9rjxVfEx-CdL0LnYSsh1IojKJyizugJJZMLtSFzjw"
+    clientId: "OK9rjxVfEx-CdL0LnYSsh1IojKJyizugJJZMLtSFzjw",
+    defaultBaseLayer: OSM_BASE_LAYER
   },
   ogf: {
     presetId: "ogf",
     name: "OpenGeofiction",
     siteUrl: "https://opengeofiction.net",
     apiBase: "https://opengeofiction.net/api/0.6/",
-    clientId: "69zxKnC1pupOQ14ZLvjAiWE9jNWutjzJSzUGFRorWmY"
+    clientId: "69zxKnC1pupOQ14ZLvjAiWE9jNWutjzJSzUGFRorWmY",
+    defaultBaseLayer: OPEN_GEOFICTION_BASE_LAYER
   },
   custom: {
     presetId: "custom",
     name: "Custom",
     siteUrl: "https://www.openstreetmap.org",
     apiBase: "https://api.openstreetmap.org/api/0.6/",
-    clientId: ""
+    clientId: "",
+    defaultBaseLayer: OSM_BASE_LAYER
   }
 };
 
 export const DEFAULT_SERVER_PRESET_ID = "osm";
+
+function normalizeBaseLayer(baseLayer, fallback) {
+  return {
+    name: baseLayer?.name?.trim?.() || fallback.name,
+    tileUrl: baseLayer?.tileUrl?.trim?.() || fallback.tileUrl,
+    attribution: baseLayer?.attribution?.trim?.() || fallback.attribution
+  };
+}
 
 function trimTrailingSlash(value) {
   return value.replace(/\/+$/, "");
@@ -62,7 +87,8 @@ export function normalizeServerConfig(config) {
     authorizationEndpoint: OAUTH_AUTHORIZATION_ENDPOINT,
     tokenEndpoint: OAUTH_TOKEN_ENDPOINT,
     revokeEndpoint: OAUTH_REVOKE_ENDPOINT,
-    clientId: config.clientId ?? fallback.clientId
+    clientId: config.clientId ?? fallback.clientId,
+    defaultBaseLayer: normalizeBaseLayer(config.defaultBaseLayer, fallback.defaultBaseLayer)
   };
 }
 

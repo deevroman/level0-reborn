@@ -299,6 +299,9 @@ function renderServerSettings(formElements, serverConfig) {
   formElements.siteUrlInput.value = serverConfig.siteUrl;
   formElements.apiBaseInput.value = serverConfig.apiBase;
   formElements.clientIdInput.value = serverConfig.clientId;
+  formElements.defaultBaseLayerNameInput.value = serverConfig.defaultBaseLayer.name;
+  formElements.defaultBaseLayerUrlInput.value = serverConfig.defaultBaseLayer.tileUrl;
+  formElements.defaultBaseLayerAttributionInput.value = serverConfig.defaultBaseLayer.attribution;
   formElements.tokenInput.value = getStoredAccessToken(serverConfig) ?? "";
   formElements.serverLabel.textContent = serverConfig.name;
   syncServerSettingsLocks(formElements, serverConfig);
@@ -521,7 +524,12 @@ function readServerSettings(formElements, presetOverride = formElements.presetSe
     name: formElements.nameInput.value,
     siteUrl: formElements.siteUrlInput.value,
     apiBase: formElements.apiBaseInput.value,
-    clientId: formElements.clientIdInput.value
+    clientId: formElements.clientIdInput.value,
+    defaultBaseLayer: {
+      name: formElements.defaultBaseLayerNameInput.value,
+      tileUrl: formElements.defaultBaseLayerUrlInput.value,
+      attribution: formElements.defaultBaseLayerAttributionInput.value
+    }
   });
 }
 
@@ -689,6 +697,7 @@ function bindServerSettings(
     }
 
     saveServerConfig(state.serverConfig);
+    state.mapController?.setDefaultBaseLayer(state.serverConfig.defaultBaseLayer);
     syncCommentDraft(formElements.commentInput);
     renderCommentHistory(commentHistoryElement);
     await syncLoginStateForCurrentServer(loginButton);
@@ -1411,6 +1420,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     siteUrlInput: document.querySelector("#server-site-url"),
     apiBaseInput: document.querySelector("#server-api-base"),
     clientIdInput: document.querySelector("#oauth-client-id"),
+    defaultBaseLayerNameInput: document.querySelector("#default-base-layer-name"),
+    defaultBaseLayerUrlInput: document.querySelector("#default-base-layer-url"),
+    defaultBaseLayerAttributionInput: document.querySelector("#default-base-layer-attribution"),
     tokenInput: document.querySelector("#oauth-token"),
     themeSelect: document.querySelector("#theme-select"),
     serverLabel: document.querySelector("#current-server-label"),
@@ -1420,13 +1432,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     serverFormElements.nameInput,
     serverFormElements.siteUrlInput,
     serverFormElements.apiBaseInput,
-    serverFormElements.clientIdInput
+    serverFormElements.clientIdInput,
+    serverFormElements.defaultBaseLayerNameInput,
+    serverFormElements.defaultBaseLayerUrlInput,
+    serverFormElements.defaultBaseLayerAttributionInput
   ];
   serverFormElements.lockableInputs = [
     serverFormElements.nameInput,
     serverFormElements.siteUrlInput,
     serverFormElements.apiBaseInput,
-    serverFormElements.clientIdInput
+    serverFormElements.clientIdInput,
+    serverFormElements.defaultBaseLayerNameInput,
+    serverFormElements.defaultBaseLayerUrlInput,
+    serverFormElements.defaultBaseLayerAttributionInput
   ];
 
   applyThemePreference(loadThemePreference());
@@ -1452,6 +1470,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     coord2textButton,
     downareaButton,
     urlInput,
+    defaultBaseLayer: state.serverConfig.defaultBaseLayer,
     onDownloadArea: async (reference) => {
       urlInput.value = reference;
       fileInput.value = "";
