@@ -666,10 +666,6 @@
       font-size: 0.95rem;
     }
 
-    .validation-list {
-      margin-top: 12px;
-    }
-
     .validation-item {
       margin: 0;
     }
@@ -683,7 +679,7 @@
     }
 
     .secondary-tools {
-      margin-top: 18px;
+      margin-bottom: 10px;
     }
 
     .secondary-tools summary {
@@ -1044,20 +1040,6 @@
 <div class="layout">
   <div class="editor-column">
     <textarea id="level0l" aria-label="Level0L editor"></textarea>
-    <div id="validation" class="validation-list"></div>
-
-    <section id="osc-section" hidden>
-      <h2 id="osmchange">OsmChange contents (this will be uploaded to the server)</h2>
-      <pre id="osc-preview"></pre>
-    </section>
-
-    <details class="secondary-tools">
-      <summary>Source debug data</summary>
-      <textarea id="osmdata" aria-label="Source data"></textarea>
-      <p style="margin-top: 10px;">
-        <button id="convert" type="button">Convert source to editor</button>
-      </p>
-    </details>
   </div>
 
   <aside class="sidebar">
@@ -1078,6 +1060,21 @@
     </div>
   </aside>
 </div>
+
+<div id="validation" class="validation-list"></div>
+
+<section id="osc-section" hidden>
+  <h2 id="osmchange">OsmChange contents (this will be uploaded to the server)</h2>
+  <pre id="osc-preview"></pre>
+</section>
+
+<details class="secondary-tools">
+  <summary>Source debug data</summary>
+  <textarea id="osmdata" aria-label="Source data"></textarea>
+  <p style="margin-top: 10px;">
+    <button id="convert" type="button">Convert source to editor</button>
+  </p>
+</details>
 
 <p>
   Useful links:
