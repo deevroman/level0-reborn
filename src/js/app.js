@@ -208,7 +208,7 @@ function setStatusWithLinks(statusElement, message, links, type = "success") {
     }
   });
 
-  if (links.length > 0) {
+  if (links.length === 1) {
     nodes.push(document.createTextNode("."));
   }
 
