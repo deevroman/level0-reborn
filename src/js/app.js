@@ -221,6 +221,7 @@ function setStatusWithLinks(statusElement, message, links, type = "success") {
       '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>' +
       "</svg>";
     const allA = document.createElement("a")
+    allA.style.cursor = "pointer"
     allA.innerHTML = externalLinkSvg
     allA.onclick = e => {
       e.preventDefault()
