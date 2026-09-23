@@ -159,6 +159,64 @@ function bindProjectInfo(projectInfoOpenButton, projectInfoDialog, projectInfoCl
   });
 }
 
+function bindDraggableDialog(dialog, dragHandle) {
+  if (!dialog || !dragHandle) {
+    return;
+  }
+
+  let activePointerId = null;
+  let pointerOffsetX = 0;
+  let pointerOffsetY = 0;
+
+  const stopDragging = (event) => {
+    if (event.pointerId !== activePointerId) {
+      return;
+    }
+
+    activePointerId = null;
+    dialog.classList.remove("is-dragging");
+  };
+
+  dragHandle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || event.target.closest("button, a, input, select, textarea")) {
+      return;
+    }
+
+    const dialogBounds = dialog.getBoundingClientRect();
+    activePointerId = event.pointerId;
+    pointerOffsetX = event.clientX - dialogBounds.left;
+    pointerOffsetY = event.clientY - dialogBounds.top;
+    dialog.style.position = "fixed";
+    dialog.style.right = "auto";
+    dialog.style.bottom = "auto";
+    dialog.style.left = `${dialogBounds.left}px`;
+    dialog.style.top = `${dialogBounds.top}px`;
+    dialog.style.transform = "none";
+    dialog.classList.add("is-dragging");
+    dragHandle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  dragHandle.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== activePointerId) {
+      return;
+    }
+
+    const dialogBounds = dialog.getBoundingClientRect();
+    const maximumLeft = Math.max(0, window.innerWidth - dialogBounds.width);
+    const maximumTop = Math.max(0, window.innerHeight - dialogBounds.height);
+    const left = Math.min(Math.max(0, event.clientX - pointerOffsetX), maximumLeft);
+    const top = Math.min(Math.max(0, event.clientY - pointerOffsetY), maximumTop);
+
+    dialog.style.left = `${left}px`;
+    dialog.style.top = `${top}px`;
+  });
+
+  dragHandle.addEventListener("pointerup", stopDragging);
+  dragHandle.addEventListener("pointercancel", stopDragging);
+  dragHandle.addEventListener("lostpointercapture", stopDragging);
+}
+
 function setStatus(statusElement, message, type = "info") {
   statusElement.dataset.type = type;
   statusElement.replaceChildren(document.createTextNode(message));
@@ -1409,7 +1467,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const downareaButton = document.querySelector("#downarea");
   const projectInfoOpenButton = document.querySelector("#project-info-open");
   const projectInfoDialog = document.querySelector("#project-info-dialog");
+  const projectInfoDialogHeader = document.querySelector("#project-info-dialog .project-dialog-header");
   const projectInfoCloseButton = document.querySelector("#project-info-close");
+  const splitPreviewDialog = document.querySelector("#split-preview-dialog");
+  const splitPreviewDialogHeader = document.querySelector("#split-preview-dialog .project-dialog-header");
+  const searchReplacePanel = document.querySelector(".search-replace-panel");
+  const searchReplaceHeader = document.querySelector(".search-replace-header");
   const statusElement = document.querySelector("#status");
   const validationElement = document.querySelector("#validation");
   const oscSectionElement = document.querySelector("#osc-section");
@@ -1418,6 +1481,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const serverFormElements = {
     container: document.querySelector(".server-settings"),
     backdrop: document.querySelector(".server-settings-backdrop"),
+    panel: document.querySelector(".server-settings-panel"),
+    header: document.querySelector(".server-settings-header"),
+    closeButton: document.querySelector("#server-settings-close"),
     presetSelect: document.querySelector("#server-preset"),
     nameInput: document.querySelector("#server-name"),
     siteUrlInput: document.querySelector("#server-site-url"),
@@ -1501,6 +1567,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   bindAuthControls(loginButton, logoutButton);
   bindProjectInfo(projectInfoOpenButton, projectInfoDialog, projectInfoCloseButton);
+  bindDraggableDialog(projectInfoDialog, projectInfoDialogHeader);
+  bindDraggableDialog(splitPreviewDialog, splitPreviewDialogHeader);
+  bindDraggableDialog(searchReplacePanel, searchReplaceHeader);
+  bindDraggableDialog(serverFormElements.panel, serverFormElements.header);
+  serverFormElements.closeButton?.addEventListener("click", () => {
+    serverFormElements.container.open = false;
+  });
+  serverFormElements.backdrop?.addEventListener("click", () => {
+    serverFormElements.container.open = false;
+  });
   bindThemeSettings(serverFormElements.themeSelect);
   bindWorkspacePersistence(urlInput, osmDataField, level0lField);
   bindSearchReplaceControl(
