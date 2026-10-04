@@ -444,7 +444,8 @@ function persistSearchReplaceState(searchInput, replaceInput, regexCheckbox) {
  */
 function autoResizeSearchReplaceTextarea(textarea) {
   textarea.style.height = "auto";
-  textarea.style.height = `${textarea.scrollHeight}px`;
+  const borderHeight = textarea.offsetHeight - textarea.clientHeight;
+  textarea.style.height = `${textarea.scrollHeight + borderHeight}px`;
 }
 
 function openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement, regexCheckbox) {
