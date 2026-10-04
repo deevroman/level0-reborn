@@ -436,6 +436,17 @@ function persistSearchReplaceState(searchInput, replaceInput, regexCheckbox) {
   });
 }
 
+/**
+ * Adjusts a search-and-replace field to fit all of its lines.
+ *
+ * @param {HTMLTextAreaElement} textarea
+ * @returns {void}
+ */
+function autoResizeSearchReplaceTextarea(textarea) {
+  textarea.style.height = "auto";
+  textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
 function openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement, regexCheckbox) {
   const selectedText = level0lField.value.slice(level0lField.selectionStart ?? 0, level0lField.selectionEnd ?? 0);
   if (selectedText.length > 0) {
@@ -1354,6 +1365,10 @@ function bindSearchReplaceControl(
   oscPreviewElement
 ) {
   const refreshCount = () => updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox);
+  const resizeFields = () => {
+    autoResizeSearchReplaceTextarea(searchInput);
+    autoResizeSearchReplaceTextarea(replaceInput);
+  };
   const persistedSearchReplaceState = loadSearchReplaceState();
 
   searchInput.value = persistedSearchReplaceState.searchValue;
@@ -1364,6 +1379,7 @@ function bindSearchReplaceControl(
 
   openButton.addEventListener("click", () => {
     openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement, regexCheckbox);
+    resizeFields();
     persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
   });
 
@@ -1376,10 +1392,12 @@ function bindSearchReplaceControl(
   });
 
   searchInput.addEventListener("input", () => {
+    autoResizeSearchReplaceTextarea(searchInput);
     persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
     refreshCount();
   });
   replaceInput.addEventListener("input", () => {
+    autoResizeSearchReplaceTextarea(replaceInput);
     persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
     refreshCount();
   });

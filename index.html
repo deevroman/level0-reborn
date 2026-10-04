@@ -598,17 +598,21 @@
     .search-replace-grid label {
       display: grid;
       grid-template-columns: 120px minmax(0, 1fr);
-      align-items: center;
+      align-items: start;
       gap: 10px;
       font-size: 0.92rem;
     }
 
-    .search-replace-grid input[type="text"] {
+    .search-replace-grid textarea {
       width: 100%;
       min-width: 0;
+      min-height: var(--control-height);
       padding: 4px 6px;
       border: 1px solid var(--border);
       background: var(--control-bg);
+      box-sizing: border-box;
+      overflow-y: hidden;
+      resize: none;
     }
 
     .search-replace-checkbox {
@@ -981,11 +985,11 @@
           <div class="search-replace-grid">
             <label>
               Search
-              <input type="text" id="search-replace-search" autocomplete="off" spellcheck="false">
+              <textarea id="search-replace-search" rows="1" autocomplete="off" spellcheck="false"></textarea>
             </label>
             <label>
               Replace with
-              <input type="text" id="search-replace-replace" autocomplete="off" spellcheck="false">
+              <textarea id="search-replace-replace" rows="1" autocomplete="off" spellcheck="false"></textarea>
             </label>
             <label>
               Mode
