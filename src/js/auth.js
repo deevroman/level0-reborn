@@ -3,6 +3,7 @@ import {
   getServerStorageKey,
   resolveServerEndpoint
 } from "./server-config.js";
+import { fetchWithRetry } from "./network.js";
 
 const ACCESS_TOKEN_KEY_PREFIX = "access_token";
 const USER_NAME_KEY_PREFIX = "osm_user_name";
@@ -49,7 +50,8 @@ export async function logout(serverConfig = getDefaultServerConfig(), fetchImpl 
     return null;
   }
 
-  const response = await fetchImpl(resolveServerEndpoint(serverConfig, serverConfig.revokeEndpoint), {
+  const revokeUrl = resolveServerEndpoint(serverConfig, serverConfig.revokeEndpoint);
+  const response = await fetchWithRetry(revokeUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -59,7 +61,7 @@ export async function logout(serverConfig = getDefaultServerConfig(), fetchImpl 
       token: accessToken,
       client_id: serverConfig.clientId
     }).toString()
-  });
+  }, fetchImpl);
 
   clearStoredAuth(serverConfig);
 
@@ -79,13 +81,14 @@ export async function exchangeAuthCodeForToken(code, serverConfig = getDefaultSe
     grant_type: "authorization_code"
   };
 
-  const response = await fetchImpl(resolveServerEndpoint(serverConfig, serverConfig.tokenEndpoint), {
+  const tokenUrl = resolveServerEndpoint(serverConfig, serverConfig.tokenEndpoint);
+  const response = await fetchWithRetry(tokenUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
     },
     body: new URLSearchParams(tokenParams).toString()
-  });
+  }, fetchImpl);
 
   const json = await response.json();
   if (!json.access_token) {
@@ -104,11 +107,12 @@ export function storeAccessToken(accessToken, serverConfig = getDefaultServerCon
 }
 
 export async function fetchCurrentUserName(accessToken, serverConfig = getDefaultServerConfig(), fetchImpl = fetch) {
-  const response = await fetchImpl(`${serverConfig.apiBase}user/details`, {
+  const userDetailsUrl = `${serverConfig.apiBase}user/details`;
+  const response = await fetchWithRetry(userDetailsUrl, {
     headers: {
       Authorization: `Bearer ${accessToken}`
     }
-  });
+  }, fetchImpl);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch current user details: ${response.status}`);

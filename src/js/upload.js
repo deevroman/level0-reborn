@@ -1,6 +1,7 @@
 import { getStoredAccessToken } from "./auth.js";
 import { GENERATOR } from "./config.js";
 import { createOsc, escapeXml } from "./level0l.js";
+import { fetchWithRetry } from "./network.js";
 import { getDefaultServerConfig } from "./server-config.js";
 
 function readResponseText(response) {
@@ -84,11 +85,12 @@ export async function uploadChanges(
     "Content-Type": "application/xml"
   };
 
-  const createResponse = await fetchImpl(`${osmServer.apiBase}changeset/create`, {
+  const createUrl = `${osmServer.apiBase}changeset/create`;
+  const createResponse = await fetchWithRetry(createUrl, {
     method: "PUT",
     headers,
     body: createChangesetXml(data, comment)
-  });
+  }, fetchImpl);
   await ensureSuccessfulResponse(createResponse, "changeset/create");
   const changesetId = (await createResponse.text()).trim();
 
@@ -96,18 +98,20 @@ export async function uploadChanges(
     throw new Error("Could not acquire changeset id for a new changeset.");
   }
 
-  const uploadResponse = await fetchImpl(`${osmServer.apiBase}changeset/${changesetId}/upload`, {
+  const uploadUrl = `${osmServer.apiBase}changeset/${changesetId}/upload`;
+  const uploadResponse = await fetchWithRetry(uploadUrl, {
     method: "POST",
     headers,
     body: createOsc(data, changesetId)
-  });
+  }, fetchImpl);
   await ensureSuccessfulResponse(uploadResponse, "changeset/upload");
   const diffResultXml = await uploadResponse.text();
 
-  const closeResponse = await fetchImpl(`${osmServer.apiBase}changeset/${changesetId}/close`, {
+  const closeUrl = `${osmServer.apiBase}changeset/${changesetId}/close`;
+  const closeResponse = await fetchWithRetry(closeUrl, {
     method: "PUT",
     headers
-  });
+  }, fetchImpl);
   await ensureSuccessfulResponse(closeResponse, "changeset/close");
 
   return {

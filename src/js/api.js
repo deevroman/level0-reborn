@@ -1,10 +1,11 @@
 import { prepareImportedFileData } from "./file-import.js";
 import { parseOsmXml } from "./osm-xml.js";
+import { fetchWithRetry } from "./network.js";
 import { getDefaultServerConfig } from "./server-config.js";
 import { urlToApiRequests } from "./url.js";
 
 export async function loadOverpassData(url, fetchImpl = fetch) {
-  const response = await fetchImpl(url);
+  const response = await fetchWithRetry(url, undefined, fetchImpl);
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
@@ -19,7 +20,7 @@ export async function loadOverpassData(url, fetchImpl = fetch) {
 }
 
 async function loadTextData(url, fetchImpl = fetch) {
-  const response = await fetchImpl(url);
+  const response = await fetchWithRetry(url, undefined, fetchImpl);
   if (!response.ok) {
     if (response.status === 410) {
       throw new Error("Deleted object")
