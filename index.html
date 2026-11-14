@@ -120,7 +120,7 @@
     .page-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 10px;
       margin-bottom: 10px;
     }
@@ -217,7 +217,7 @@
       visibility: hidden;
     }
 
-    #login:not(:disabled) + #logout {
+    #login:not([data-logged-in="true"]) + #logout {
       display: none;
     }
 
@@ -981,6 +981,17 @@
 
       .auth-controls {
           gap: 4px;
+      }
+
+      #login[data-logged-in="true"] + #logout {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+      }
+
+      .auth-controls.is-logout-open #login[data-logged-in="true"] + #logout {
+        display: block;
       }
 
       .toolbar,

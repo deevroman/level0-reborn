@@ -100,14 +100,28 @@ function saveThemePreference(theme) {
 
 function setLoginState(loginButton, userName = "") {
   const isLoggedIn = userName.length > 0;
+  const mobile = window.matchMedia("(max-width: 550px)").matches;
   loginButton.textContent = isLoggedIn ? userName : "Log in";
-  loginButton.disabled = isLoggedIn;
+  loginButton.disabled = isLoggedIn && !mobile;
+  loginButton.dataset.loggedIn = String(isLoggedIn);
+  loginButton.parentElement.classList.remove("is-logout-open");
+  if (isLoggedIn && mobile) {
+    loginButton.setAttribute("aria-expanded", "false");
+    loginButton.setAttribute("aria-controls", "logout");
+  } else {
+    loginButton.removeAttribute("aria-expanded");
+    loginButton.removeAttribute("aria-controls");
+  }
   loginButton.dataset.authReady = "true";
 }
 
 function setLoginButtonPending(loginButton, message) {
   loginButton.textContent = message;
   loginButton.disabled = true;
+  loginButton.dataset.loggedIn = "false";
+  loginButton.parentElement.classList.remove("is-logout-open");
+  loginButton.removeAttribute("aria-expanded");
+  loginButton.removeAttribute("aria-controls");
   loginButton.dataset.authReady = "true";
 }
 
@@ -723,14 +737,47 @@ async function restoreSession(loginButton) {
 }
 
 function bindAuthControls(loginButton, logoutButton) {
+  const mobileView = window.matchMedia("(max-width: 550px)");
+  const authControls = loginButton.parentElement;
+  const closeLogoutMenu = () => {
+    authControls.classList.remove("is-logout-open");
+    if (loginButton.hasAttribute("aria-expanded")) {
+      loginButton.setAttribute("aria-expanded", "false");
+    }
+  };
+
+  mobileView.addEventListener("change", () => {
+    if (loginButton.dataset.loggedIn === "true") {
+      setLoginState(loginButton, loginButton.textContent);
+    }
+  });
   loginButton.addEventListener("click", () => {
+    if (loginButton.dataset.loggedIn === "true") {
+      if (mobileView.matches) {
+        const open = authControls.classList.toggle("is-logout-open");
+        loginButton.setAttribute("aria-expanded", String(open));
+      }
+      return;
+    }
     setLoginButtonPending(loginButton, "Redirecting...");
     login(state.serverConfig);
   });
 
   logoutButton.addEventListener("click", async () => {
+    closeLogoutMenu();
     await logout(state.serverConfig);
     setLoginState(loginButton);
+  });
+  document.addEventListener("click", (event) => {
+    if (!authControls.contains(event.target)) {
+      closeLogoutMenu();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && authControls.classList.contains("is-logout-open")) {
+      closeLogoutMenu();
+      loginButton.focus();
+    }
   });
 }
 
