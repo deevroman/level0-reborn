@@ -1870,6 +1870,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     downareaButton,
     urlInput,
     defaultBaseLayer: state.serverConfig.defaultBaseLayer,
+    onEditError: (message) => setStatus(statusElement, message, "error"),
     onDownloadArea: async (reference) => {
       urlInput.value = reference;
       fileInput.value = "";

@@ -157,7 +157,8 @@ export function initMapEditor({
   downareaButton,
   urlInput,
   defaultBaseLayer = DEFAULT_BASE_LAYER,
-  onDownloadArea
+  onDownloadArea,
+  onEditError
 }) {
   const leaflet = getLeaflet();
   if (!leaflet || !mapElement) {
@@ -435,12 +436,20 @@ export function initMapEditor({
       textarea.selectionStart,
       coordsInput.value
     );
-    const textChanged = textarea.value !== updated.text;
-    textarea.value = updated.text;
-    textarea.setSelectionRange(updated.selectionStart, updated.selectionStart);
-    if (textChanged) {
-      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    if (textarea.value !== updated.text) {
+      const originalSelectionStart = textarea.selectionStart;
+      const originalSelectionEnd = textarea.selectionEnd;
+      textarea.focus();
+      textarea.setSelectionRange(0, textarea.value.length);
+      const applied = typeof document.execCommand === "function"
+        && document.execCommand("insertText", false, updated.text);
+      if (!applied) {
+        textarea.setSelectionRange(originalSelectionStart, originalSelectionEnd);
+        onEditError?.("Could not update coordinates with undo support in this browser.");
+        return;
+      }
     }
+    textarea.setSelectionRange(updated.selectionStart, updated.selectionStart);
     drawLoadedObjects();
     if (insertedCenter) {
       setCenter([insertedCenter.lat, insertedCenter.lon]);
