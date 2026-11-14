@@ -4,8 +4,41 @@ import { fetchWithRetry } from "./network.js";
 import { getDefaultServerConfig } from "./server-config.js";
 import { urlToApiRequests } from "./url.js";
 
+/**
+ * Converts Fairway Mapper interpreter URLs into form-encoded POST requests.
+ * @param {string} url Original request URL.
+ * @returns {{url: string, options: RequestInit | undefined}} Request URL and options.
+ */
+function prepareOverpassRequest(url) {
+  const parsed = new URL(url);
+  if (parsed.hostname !== "api.fairwaymapper.com" || !/\/interpreter\/?$/.test(parsed.pathname) || !parsed.searchParams.has("data")) {
+    return { url, options: undefined };
+  }
+
+  const body = new URLSearchParams();
+  for (const value of parsed.searchParams.getAll("data")) {
+    body.append("data", value);
+  }
+  parsed.searchParams.delete("data");
+  parsed.hash = "";
+  return {
+    url: parsed.toString(),
+    options: { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: body.toString() }
+  };
+}
+
+/**
+ * @param {string} url Request URL.
+ * @param {typeof fetch} fetchImpl Fetch implementation.
+ * @returns {Promise<Response>} Server response.
+ */
+function fetchOverpassCompatible(url, fetchImpl) {
+  const request = prepareOverpassRequest(url);
+  return fetchWithRetry(request.url, request.options, fetchImpl);
+}
+
 export async function loadOverpassData(url, fetchImpl = fetch) {
-  const response = await fetchWithRetry(url, undefined, fetchImpl);
+  const response = await fetchOverpassCompatible(url, fetchImpl);
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
@@ -20,7 +53,7 @@ export async function loadOverpassData(url, fetchImpl = fetch) {
 }
 
 async function loadTextData(url, fetchImpl = fetch) {
-  const response = await fetchWithRetry(url, undefined, fetchImpl);
+  const response = await fetchOverpassCompatible(url, fetchImpl);
   if (!response.ok) {
     if (response.status === 410) {
       throw new Error("Deleted object")
@@ -109,6 +142,10 @@ export async function loadSupportedUrl(input, osmServer = getDefaultServerConfig
     const parts = await Promise.all(
       requestList.map(async (url) => {
         try {
+          if (prepareOverpassRequest(url).options) {
+            const response = await loadOverpassData(url, fetchImpl);
+            return response.elements ?? response;
+          }
           return parseOsmXml(await loadTextData(url, fetchImpl));
         } catch (e) {
           if (e.message === "Deleted object") { // todo

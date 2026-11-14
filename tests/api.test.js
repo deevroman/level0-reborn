@@ -6,6 +6,38 @@ import { getPresetServerConfig } from "../src/js/server-config.js";
 
 const DEV_SERVER = getPresetServerConfig("osm-dev");
 
+test("Fairway Mapper interpreter requests use POST and preserve encoded query data", async () => {
+  const query = '[out:json];node["name"="A+B & C"](1,2,3,4);out;';
+  const input = `api.fairwaymapper.com/api/interpreter?foo=bar&data=${encodeURIComponent(query)}`;
+  const result = await loadSupportedUrl(input, DEV_SERVER, async (url, options) => {
+    assert.equal(url, "https://api.fairwaymapper.com/api/interpreter?foo=bar");
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers["Content-Type"], "application/x-www-form-urlencoded;charset=UTF-8");
+    assert.equal(new URLSearchParams(options.body).get("data"), query);
+    return createXmlResponse(JSON.stringify({ elements: [{ type: "node", id: 1, lat: 1, lon: 2 }] }));
+  });
+  assert.equal(result.data[0].id, 1);
+});
+
+test("Fairway Mapper interpreter accepts XML responses", async () => {
+  const input = "https://api.fairwaymapper.com/api/interpreter?data=node%281%29%3Bout%3B";
+  const result = await loadSupportedUrl(input, DEV_SERVER, async (url, options) => {
+    assert.equal(url, "https://api.fairwaymapper.com/api/interpreter");
+    assert.equal(options.method, "POST");
+    return createXmlResponse('<osm version="0.6"><node id="1" lat="1" lon="2" /></osm>');
+  });
+  assert.equal(result.data[0].id, 1);
+});
+
+test("other Overpass servers continue to use GET", async () => {
+  const input = "https://overpass-api.de/api/interpreter?data=node%281%29%3Bout%3B";
+  await loadSupportedUrl(input, DEV_SERVER, async (url, options) => {
+    assert.equal(url, input);
+    assert.equal(options, undefined);
+    return createXmlResponse('<osm version="0.6"><node id="1" lat="1" lon="2" /></osm>');
+  });
+});
+
 function createXmlResponse(xml) {
   return {
     ok: true,

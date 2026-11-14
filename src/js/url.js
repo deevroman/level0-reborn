@@ -110,6 +110,14 @@ function buildMapBboxUrl(osmServer, lat, lon, zoom = MAP_DOWNLOAD_BASE_ZOOM) {
 
 function findOverpassMatch(url) {
   const normalized = url.replace(/^https?:\/\//, "");
+  try {
+    const parsed = new URL(`https://${normalized}`);
+    if (parsed.hostname === "api.fairwaymapper.com" && /\/interpreter\/?$/.test(parsed.pathname) && parsed.searchParams.has("data")) {
+      return parsed.toString();
+    }
+  } catch {
+    // Continue with the other supported URL formats.
+  }
   const httpsHost = OVERPASS_HTTPS_HOSTS.find((host) => normalized.startsWith(host) && normalized.includes(`/interpreter?data=`));
   if (httpsHost) {
     return `https://${normalized}`;
