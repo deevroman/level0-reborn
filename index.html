@@ -173,6 +173,8 @@
       align-items: center;
       gap: 8px;
       margin: 0;
+      position: relative;
+      z-index: 3100;
     }
 
     h2 {
@@ -314,17 +316,13 @@
     .project-dialog-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 12px;
       margin: 0 -18px 10px;
       padding: 16px 18px 0;
       cursor: grab;
       touch-action: none;
       user-select: none;
-    }
-
-    #split-preview-dialog .project-dialog-header {
-      align-items: center;
     }
 
     .project-dialog.is-dragging .project-dialog-header {
@@ -472,6 +470,10 @@
       gap: 10px;
     }
 
+    .toolbar-button-pair {
+      display: contents;
+    }
+
     .toolbar-actions details {
       margin: 0;
     }
@@ -535,7 +537,9 @@
     }
 
     .search-replace {
-      position: relative;
+      position: fixed;
+      top: 0;
+      right: 0;
       margin: 0;
     }
 
@@ -592,7 +596,7 @@
     .server-settings-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 12px;
       margin: 0 -10px 10px;
       padding: 8px 10px 0;
@@ -813,7 +817,7 @@
     }
 
     .editor-highlights mark.replace-target {
-      background: rgba(255, 110, 0, 0.75);
+      background: #ff45e9;
     }
 
     .editor-highlights .validation-error {
@@ -831,6 +835,11 @@
 
     .editor-column.is-highlighting textarea {
       background: transparent;
+    }
+
+    .editor-column.is-searching textarea::selection {
+      color: #fff;
+      background: #ff45e9;
     }
 
     .sidebar {
@@ -861,6 +870,14 @@
       border: 1px solid var(--border);
     }
 
+    .map-container {
+      position: relative;
+    }
+
+    .map-to-editor {
+      display: none;
+    }
+
     .map-placeholder {
       display: grid;
       place-items: center;
@@ -868,6 +885,16 @@
       color: var(--map-placeholder-text);
       text-align: center;
       font-size: 0.95rem;
+    }
+
+    @media (any-pointer: coarse) {
+      .leaflet-control-layers-list label {
+        display: flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 4px 8px;
+        font-size: 1rem;
+      }
     }
 
     .validation-item {
@@ -923,6 +950,27 @@
     }
 
     @media (max-width: 550px) {
+      #map {
+        height: calc(400px - var(--map-controls-height));
+      }
+
+      .map-to-editor {
+        position: absolute;
+        right: 10px;
+        bottom: 28px;
+        z-index: 500;
+        display: block;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        color: #333;
+        background: #fff;
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        background-clip: padding-box;
+        border-radius: 4px;
+        font-size: 1.5rem;
+      }
+
       .page-header {
           gap: 1px;
       }
@@ -935,18 +983,36 @@
           gap: 4px;
       }
 
+      .toolbar,
+      .toolbar-row-top {
+        gap: 12px;
+      }
+
+      .toolbar-row {
+        row-gap: 12px;
+      }
+
+      .toolbar-row-main .toolbar-break,
+      .comment-break {
+        display: none;
+      }
+
       .toolbar-row button,
       .toolbar-row input[type="text"] {
         width: 100%;
         margin: 0;
       }
 
-      .upload-actions {
+      .upload-actions,
+      .toolbar-button-pair {
+        display: flex;
+        gap: 10px;
         width: 100%;
         flex-wrap: nowrap;
       }
 
-      .toolbar-row .upload-actions button {
+      .toolbar-row .upload-actions button,
+      .toolbar-row .toolbar-button-pair button {
         flex: 1 1 0;
         width: auto;
         min-width: 0;
@@ -1022,10 +1088,47 @@
       <button id="project-info-open" type="button" aria-haspopup="dialog" aria-label="About Level0 Reborn">?</button>
     </span>
   </h2>
-  <p class="auth-controls">
+  <div class="auth-controls">
     <button id="login" type="button" data-auth-ready="false">Log in</button>
     <button id="logout" type="button">Log out</button>
-  </p>
+    <div class="search-replace" id="search-replace-panel-wrap" hidden>
+      <div class="search-replace-panel" role="dialog" aria-labelledby="search-replace-title">
+        <div class="search-replace-header">
+          <h3 id="search-replace-title">Search and replace</h3>
+          <button id="search-replace-close" class="search-replace-close" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="search-replace-grid">
+          <label>
+            Search
+            <textarea id="search-replace-search" rows="1" autocomplete="off" spellcheck="false"></textarea>
+          </label>
+          <label>
+            Replace with
+            <textarea id="search-replace-replace" rows="1" autocomplete="off" spellcheck="false"></textarea>
+          </label>
+          <label class="search-replace-mode">
+            Mode
+            <span class="search-replace-checkbox">
+              <input type="checkbox" id="search-replace-regex">
+              <span>Regular expression</span>
+            </span>
+          </label>
+          <div class="search-replace-buttons">
+            <p class="search-replace-navigation">
+              <button id="search-replace-previous" class="search-arrow search-arrow-previous" type="button">Prev</button>
+              <button id="search-replace-one" type="button">Replace</button>
+              <button id="search-replace-next" class="search-arrow search-arrow-next" type="button">Next</button>
+            </p>
+            <span id="search-replace-count" class="search-replace-count" aria-label="Match 0 of 0">0/0</span>
+            <p class="search-replace-actions">
+              <button id="search-replace-apply" class="search-replace-all" type="button">Replace all</button>
+              <span id="search-replace-error" class="search-replace-error" role="status"></span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <script>
     (() => {
       const defaultServer = {
@@ -1119,58 +1222,26 @@
     <div class="toolbar-row toolbar-row-main">
       <label class="toolbar-field toolbar-field-grow" for="url-input">
         <span>URL or group of IDs like "n54,w33":</span>
-        <input type="text" name="url" id="url-input" autocomplete="off">
+        <input type="text" name="url" id="url-input" autocomplete="off" enterkeyhint="go">
+        <script>try { document.getElementById("url-input").value = localStorage.getItem("initial_url_draft_v1") ?? ""; } catch {}</script>
       </label>
       <span class="toolbar-break" aria-hidden="true"></span>
       <label class="toolbar-field" for="file-input">
         <span>OSM or OSC file:</span>
         <input type="file" id="file-input" accept=".osm,.osc,.xml,text/xml,application/xml">
       </label>
-      <button id="add" type="button">Add to editor</button>
-      <button id="replace" type="button">Replace data in editor</button>
-      <button id="revert" type="button">Revert changes</button>
-      <button id="clear" type="button">Clear data</button>
+      <div class="toolbar-button-pair">
+        <button id="add" type="button">Add to editor</button>
+        <button id="replace" type="button">Replace data in editor</button>
+      </div>
+      <div class="toolbar-button-pair">
+        <button id="revert" type="button">Revert changes</button>
+        <button id="clear" type="button">Clear data</button>
+      </div>
       <span class="toolbar-break" aria-hidden="true"></span>
     </div>
 
     <div class="toolbar-actions">
-      <div class="search-replace" id="search-replace-panel-wrap" hidden>
-        <div class="search-replace-panel" role="dialog" aria-labelledby="search-replace-title">
-          <div class="search-replace-header">
-            <h3 id="search-replace-title">Search and replace</h3>
-            <button id="search-replace-close" class="search-replace-close" type="button" aria-label="Close">×</button>
-          </div>
-          <div class="search-replace-grid">
-            <label>
-              Search
-              <textarea id="search-replace-search" rows="1" autocomplete="off" spellcheck="false"></textarea>
-            </label>
-            <label>
-              Replace with
-              <textarea id="search-replace-replace" rows="1" autocomplete="off" spellcheck="false"></textarea>
-            </label>
-            <label class="search-replace-mode">
-              Mode
-              <span class="search-replace-checkbox">
-                <input type="checkbox" id="search-replace-regex">
-                <span>Regular expression</span>
-              </span>
-            </label>
-            <div class="search-replace-buttons">
-              <p class="search-replace-navigation">
-                <button id="search-replace-previous" class="search-arrow search-arrow-previous" type="button">Prev</button>
-                <button id="search-replace-one" type="button">Replace</button>
-                <button id="search-replace-next" class="search-arrow search-arrow-next" type="button">Next</button>
-              </p>
-              <span id="search-replace-count" class="search-replace-count" aria-label="Match 0 of 0">0/0</span>
-              <p class="search-replace-actions">
-                <button id="search-replace-apply" class="search-replace-all" type="button">Replace all</button>
-                <span id="search-replace-error" class="search-replace-error" role="status"></span>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
       <details class="server-settings">
         <summary>Settings: <span id="current-server-label">OpenStreetMap</span></summary>
         <span class="server-settings-backdrop" aria-hidden="true"></span>
@@ -1248,15 +1319,20 @@
   </div>
 
   <div class="toolbar-row">
-    <button id="download" type="button">Download .osm</button>
-    <button id="validate" type="button">Validate</button>
+    <div class="toolbar-button-pair">
+      <button id="download" type="button">Download .osm</button>
+      <button id="validate" type="button">Validate</button>
+    </div>
 <!--    <button id="check" type="button" disabled>Check for conflicts</button>-->
-    <button id="show-osc" type="button">Show osmChange</button>
-    <button id="search-replace-open" type="button">Search and replace</button>
-    <span class="toolbar-break" aria-hidden="true"></span>
+    <div class="toolbar-button-pair">
+      <button id="show-osc" type="button">Show osmChange</button>
+      <button id="search-replace-open" type="button">Search and replace</button>
+    </div>
+    <span class="toolbar-break comment-break" aria-hidden="true"></span>
     <label class="toolbar-field toolbar-field-grow" for="comment-input">
       <span>Changeset comment:</span>
       <input type="text" id="comment-input" maxlength="255" autocomplete="off" list="comment-history">
+      <script>try { document.getElementById("comment-input").value = localStorage.getItem("initial_comment_draft_v1") ?? ""; } catch {}</script>
     </label>
     <datalist id="comment-history"></datalist>
     <div class="upload-actions">
@@ -1282,12 +1358,15 @@
         <input type="text" id="coords" value="">
         <button id="downarea" type="button" disabled>Edit this area</button>
       </div>
-      <div id="map" class="map-placeholder">
-        <div>
-          Map panel is not ported yet.
-          <br>
-          URL loading, validation and upload are active.
+      <div class="map-container">
+        <div id="map" class="map-placeholder">
+          <div>
+            Map panel is not ported yet.
+            <br>
+            URL loading, validation and upload are active.
+          </div>
         </div>
+        <button class="map-to-editor" id="map-to-editor" type="button" aria-label="Scroll to editor" title="Scroll to editor">↑</button>
       </div>
     </div>
   </aside>
@@ -1312,11 +1391,11 @@
 
 <p class="footer-links">
   Useful links:
+  <a href="https://github.com/deevroman/level0-reborn/issues" target="_blank" rel="noreferrer">GitHub Issues</a>,
   <a href="https://wiki.openstreetmap.org/wiki/Level0" target="_blank" rel="noreferrer">about Level0</a>,
   <a href="https://wiki.openstreetmap.org/wiki/Level0L" target="_blank" rel="noreferrer">language reference</a>,
   <a href="https://wiki.openstreetmap.org/wiki/Map_Features" target="_blank" rel="noreferrer">tag reference</a>,
-  <a href="https://taginfo.openstreetmap.org/" target="_blank" rel="noreferrer">tag statistics</a>,
-  <a href="https://github.com/deevroman/level0-reborn/issues" target="_blank" rel="noreferrer">GitHub Issues</a>.
+  <a href="https://taginfo.openstreetmap.org/" target="_blank" rel="noreferrer">tag statistics</a>.
 </p>
 
 <script src="./src/vendor/leaflet/leaflet.js"></script>

@@ -391,8 +391,22 @@ function syncServerSettingsLocks(formElements, serverConfig) {
   }
 }
 
+/**
+ * Keeps a small synchronous copy for the first page render.
+ * @param {"url"|"comment"} field Draft field to cache.
+ * @param {string} value Current field value.
+ */
+function cacheInitialDraft(field, value) {
+  try {
+    localStorage.setItem(`initial_${field}_draft_v1`, value);
+  } catch {
+    // IndexedDB remains the primary draft storage.
+  }
+}
+
 function syncCommentDraft(commentInput) {
   commentInput.value = loadCommentDraft(state.serverConfig);
+  cacheInitialDraft("comment", commentInput.value);
 }
 
 function renderCommentHistory(commentHistoryElement) {
@@ -411,6 +425,7 @@ function renderCommentHistory(commentHistoryElement) {
 }
 
 function persistWorkspaceState(urlInput, osmDataField, level0lField) {
+  cacheInitialDraft("url", urlInput.value);
   saveWorkspaceState({
     urlValue: urlInput.value,
     osmDataValue: osmDataField.value,
@@ -488,11 +503,38 @@ function openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField
     searchInput.value = selectedText;
   }
 
+  const panel = panelWrap.querySelector(".search-replace-panel");
   panelWrap.hidden = false;
   panelWrap.classList.add("open");
+  const mobile = window.matchMedia("(max-width: 550px)").matches;
+  if (mobile) {
+    const visibleTop = window.visualViewport?.offsetTop ?? 0;
+    const panelBounds = panel.getBoundingClientRect();
+    panel.style.position = "fixed";
+    panel.style.left = `${Math.max(8, (window.innerWidth - panelBounds.width) / 2)}px`;
+    panel.style.top = `${visibleTop + 8}px`;
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+    panel.style.transform = "none";
+    panel.dataset.mobilePosition = "true";
+  } else {
+    const buttonBounds = openButton.getBoundingClientRect();
+    const panelBounds = panel.getBoundingClientRect();
+    const rightFits = buttonBounds.right + 8 + panelBounds.width <= window.innerWidth - 8;
+    const left = rightFits ? buttonBounds.right + 8 : Math.max(8, window.innerWidth - panelBounds.width - 8);
+    const desiredTop = rightFits ? buttonBounds.top : buttonBounds.bottom + 8;
+    const top = Math.max(8, Math.min(desiredTop, window.innerHeight - panelBounds.height - 8));
+    panel.style.position = "fixed";
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+    panel.style.transform = "none";
+    delete panel.dataset.mobilePosition;
+  }
   openButton?.setAttribute("aria-expanded", "true");
   updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox);
-  searchInput.focus();
+  searchInput.focus({ preventScroll: mobile });
   searchInput.select();
 }
 
@@ -511,11 +553,12 @@ function restoreWorkspaceState(
   oscPreviewElement
 ) {
   const workspaceState = loadWorkspaceState();
+  urlInput.value = workspaceState?.urlValue ?? "";
+  cacheInitialDraft("url", urlInput.value);
   if (!workspaceState) {
     return;
   }
 
-  urlInput.value = workspaceState.urlValue;
   osmDataField.value = workspaceState.osmDataValue;
   level0lField.value = workspaceState.level0lValue;
   state.baseData = workspaceState.baseData;
@@ -580,6 +623,8 @@ function clearEditorState(
   fileInput.value = "";
   commentInput.value = "";
   clearCommentDraft(state.serverConfig);
+  cacheInitialDraft("url", "");
+  cacheInitialDraft("comment", "");
   osmDataField.value = "";
   level0lField.value = "";
   state.mapController?.refreshFromText();
@@ -933,12 +978,15 @@ function bindLoadControls(addButton, replaceButton, urlInput, fileInput, osmData
     await loadIntoEditor(urlInput, fileInput, osmDataField, level0lField, statusElement, "replace");
   });
 
-  urlInput.addEventListener("keypress", async (event) => {
-    if (event.key !== "Enter") {
+  urlInput.addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter" || event.isComposing) {
       return;
     }
 
     event.preventDefault();
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      urlInput.blur();
+    }
     removeUrlParameterFromAddress("center");
     await loadIntoEditor(urlInput, fileInput, osmDataField, level0lField, statusElement, "add");
   });
@@ -1047,6 +1095,7 @@ function bindUploadControl(
 
   commentInput.addEventListener("input", () => {
     saveCommentDraft(state.serverConfig, commentInput.value);
+    cacheInitialDraft("comment", commentInput.value);
   });
 
   commentInput.addEventListener("keydown", (event) => {
@@ -1086,6 +1135,7 @@ function bindUploadControl(
       setEditorFromBase(level0lField);
       commentInput.value = "";
       clearCommentDraft(state.serverConfig);
+      cacheInitialDraft("comment", "");
       renderValidation(validationElement, []);
       state.oscPreview = "";
       renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
@@ -1144,6 +1194,7 @@ function bindUploadControl(
       setEditorFromBase(level0lField);
       commentInput.value = "";
       clearCommentDraft(state.serverConfig);
+      cacheInitialDraft("comment", "");
       renderValidation(validationElement, []);
       state.oscPreview = "";
       renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
@@ -1445,7 +1496,38 @@ function bindSearchReplaceControl(
 ) {
   const highlights = document.querySelector("#editor-highlights");
   const editorColumn = level0lField.parentElement;
+  const searchPanel = panelWrap.querySelector(".search-replace-panel");
+  const visualViewport = window.visualViewport;
+  let lastViewportTop = visualViewport?.offsetTop ?? 0;
+  let pendingMobileAlignment = false;
+  let mobileAlignmentTimeout = null;
   let navigatedMatch = null;
+
+  const alignMobileEditor = () => {
+    if (panelWrap.hidden || !window.matchMedia("(max-width: 550px)").matches) {
+      return;
+    }
+    const editorTop = level0lField.getBoundingClientRect().top;
+    const panelBottom = searchPanel.getBoundingClientRect().bottom;
+    window.scrollBy({ top: editorTop - panelBottom - 12, behavior: "instant" });
+  };
+
+  const syncVisualViewport = () => {
+    const viewportTop = visualViewport.offsetTop;
+    const shift = viewportTop - lastViewportTop;
+    lastViewportTop = viewportTop;
+    if (shift !== 0 && searchPanel.style.position === "fixed") {
+      searchPanel.style.top = `${parseFloat(searchPanel.style.top) + shift}px`;
+    }
+  };
+  visualViewport?.addEventListener("scroll", syncVisualViewport);
+  visualViewport?.addEventListener("resize", () => {
+    syncVisualViewport();
+    if (pendingMobileAlignment && !panelWrap.hidden) {
+      pendingMobileAlignment = false;
+      requestAnimationFrame(alignMobileEditor);
+    }
+  });
   const syncHighlightSizeAndScroll = () => {
     highlights.style.left = `${level0lField.offsetLeft + level0lField.clientLeft}px`;
     highlights.style.top = `${level0lField.offsetTop + level0lField.clientTop}px`;
@@ -1457,6 +1539,7 @@ function bindSearchReplaceControl(
   const refreshHighlights = () => {
     let matches = [];
     let replaceTarget = null;
+    editorColumn.classList.toggle("is-searching", !panelWrap.hidden);
     if (!panelWrap.hidden) {
       try {
         matches = findSearchHighlights(level0lField.value, searchInput.value, regexCheckbox.checked);
@@ -1547,6 +1630,11 @@ function bindSearchReplaceControl(
   openButton.setAttribute("aria-expanded", "false");
 
   openButton.addEventListener("click", () => {
+    if (!panelWrap.hidden) {
+      closeSearchReplacePanel(openButton, panelWrap);
+      refreshHighlights();
+      return;
+    }
     openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement, regexCheckbox);
     automaticRegexSuppressed = false;
     regexAutomaticallyEnabled = false;
@@ -1558,6 +1646,14 @@ function bindSearchReplaceControl(
     resizeFields();
     refreshCount();
     persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
+    if (window.matchMedia("(max-width: 550px)").matches) {
+      pendingMobileAlignment = true;
+      clearTimeout(mobileAlignmentTimeout);
+      mobileAlignmentTimeout = setTimeout(() => {
+        pendingMobileAlignment = false;
+      }, 1000);
+      requestAnimationFrame(alignMobileEditor);
+    }
   });
 
   closeButton.addEventListener("click", () => {
@@ -1615,7 +1711,7 @@ function bindSearchReplaceControl(
     refreshCount();
   });
 
-  const moveToMatch = (direction) => {
+  const moveToMatch = (direction, keepButtonFocus = false) => {
     const search = searchInput.value;
     if (search.length === 0) {
       setStatus(statusElement, "Enter text to search for.", "error");
@@ -1644,7 +1740,9 @@ function bindSearchReplaceControl(
 
       navigatedMatch = match;
       refreshCount();
-      level0lField.focus();
+      if (!keepButtonFocus) {
+        level0lField.focus();
+      }
       level0lField.setSelectionRange(match.index, match.index + match.length);
     } catch (error) {
       setStatus(statusElement, error.message, "error");
@@ -1664,12 +1762,12 @@ function bindSearchReplaceControl(
     });
   }
 
-  previousButton.addEventListener("click", () => {
-    moveToMatch("previous");
+  previousButton.addEventListener("click", (event) => {
+    moveToMatch("previous", event.detail === 0);
   });
 
-  nextButton.addEventListener("click", () => {
-    moveToMatch("next");
+  nextButton.addEventListener("click", (event) => {
+    moveToMatch("next", event.detail === 0);
   });
 
   const replaceMatches = (replaceAll) => {
@@ -1747,8 +1845,15 @@ function bindSearchReplaceControl(
     }
   };
 
-  replaceButton.addEventListener("click", () => {
-    replaceMatches(false);
+  replaceButton.addEventListener("click", (event) => {
+    const keepButtonFocus = event.detail === 0;
+    try {
+      replaceMatches(false);
+    } finally {
+      if (keepButtonFocus) {
+        replaceButton.focus({ preventScroll: true });
+      }
+    }
   });
 
   applyButton.addEventListener("click", () => {
@@ -1793,6 +1898,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const coordsInput = document.querySelector("#coords");
   const centerInput = document.querySelector("#center-input");
   const mapElement = document.querySelector("#map");
+  const mapToEditorButton = document.querySelector("#map-to-editor");
   const coord2textButton = document.querySelector("#coord2text");
   const downareaButton = document.querySelector("#downarea");
   const projectInfoOpenButton = document.querySelector("#project-info-open");
@@ -1807,6 +1913,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const validationElement = document.querySelector("#validation");
   const oscSectionElement = document.querySelector("#osc-section");
   const oscPreviewElement = document.querySelector("#osc-preview");
+
+  mapToEditorButton.addEventListener("click", () => {
+    level0lField.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
 
   const serverFormElements = {
     container: document.querySelector(".server-settings"),
