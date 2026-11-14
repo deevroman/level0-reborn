@@ -435,8 +435,12 @@ export function initMapEditor({
       textarea.selectionStart,
       coordsInput.value
     );
+    const textChanged = textarea.value !== updated.text;
     textarea.value = updated.text;
     textarea.setSelectionRange(updated.selectionStart, updated.selectionStart);
+    if (textChanged) {
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     drawLoadedObjects();
     if (insertedCenter) {
       setCenter([insertedCenter.lat, insertedCenter.lon]);

@@ -11,6 +11,14 @@ import {
 } from "../src/js/level0l.js";
 import { GENERATOR } from "../src/js/config.js";
 
+test("entity validation reports the header line for incomplete ways and relations", () => {
+  const { validation } = parseLevel0L("way -1\n  name=First\n\nrelation -2\n  name=Second");
+  assert.deepEqual(validation, [
+    [true, 0, "Way -1 has less than two nodes"],
+    [true, 3, "Relation -2 has no members"]
+  ]);
+});
+
 test("parseLevel0L parses nodes, ways and relations without validation errors", () => {
   const source = [
     "node 10: 55.75, 37.61",

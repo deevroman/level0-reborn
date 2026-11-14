@@ -140,6 +140,7 @@ export function parseLevel0L(level0lString) {
   const validation = [];
   const foundChangeset = { value: false };
   let currentEntity = null;
+  let currentEntityLine = 0;
   let lineNumber = 0;
 
   for (lineNumber = 0; lineNumber < lines.length; lineNumber += 1) {
@@ -156,11 +157,12 @@ export function parseLevel0L(level0lString) {
 
     if (headerMatch) {
       if (currentEntity) {
-        validateEntity(currentEntity, lineNumber - 1, validation);
+        validateEntity(currentEntity, currentEntityLine, validation);
         data.push(currentEntity);
       }
 
       currentEntity = createEntity(headerMatch, lineNumber, validation, foundChangeset);
+      currentEntityLine = lineNumber;
       continue;
     }
 
@@ -177,7 +179,7 @@ export function parseLevel0L(level0lString) {
   }
 
   if (currentEntity) {
-    validateEntity(currentEntity, lineNumber, validation);
+    validateEntity(currentEntity, currentEntityLine, validation);
     data.push(currentEntity);
   }
 

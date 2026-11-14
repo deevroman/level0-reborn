@@ -51,8 +51,13 @@ import { parseMapCenterParameter, parseMapViewReference, removeQueryParameter } 
 import {
   countLineRegexOccurrences,
   countLiteralOccurrences,
+  findLineRegexMatch,
+  findLiteralMatch,
+  findSearchHighlights,
   replaceAllLineRegex,
-  replaceAllLiteral
+  replaceAllLiteral,
+  replaceSearchMatch,
+  updateAutomaticRegexMode
 } from "./search-replace.js";
 
 const THEME_STORAGE_KEY = "theme_preference_v1";
@@ -298,6 +303,7 @@ function setStatusWithLinks(statusElement, message, links, type = "success") {
 }
 
 function renderValidation(validationElement, validation) {
+  state.validation = validation;
   validationElement.replaceChildren();
 
   for (const [isError, line, message] of validation) {
@@ -307,6 +313,7 @@ function renderValidation(validationElement, validation) {
     item.textContent = `Line ${line + 1}: ${message}`;
     validationElement.append(item);
   }
+  state.refreshEditorHighlights?.();
 }
 
 function renderOscPreview(sectionElement, previewElement, oscText) {
@@ -333,12 +340,16 @@ function parseEditor(level0lField) {
   return parseLevel0L(level0lField.value);
 }
 
-function buildUploadData(level0lField, validationElement) {
+function buildUploadData(level0lField, validationElement, { rejectWarnings = false } = {}) {
   const { data, validation } = parseEditor(level0lField);
   renderValidation(validationElement, validation);
 
   if (validation.some(([isError]) => isError)) {
     throw new Error("There are severe validation errors, please fix them.");
+  }
+
+  if (rejectWarnings && validation.length > 0) {
+    throw new Error("There are validation warnings, please fix them before splitting the upload.");
   }
 
   return prepareUploadData(data, state.baseData);
@@ -409,23 +420,26 @@ function persistWorkspaceState(urlInput, osmDataField, level0lField) {
   });
 }
 
-function updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox) {
+function updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox, currentMatch = null) {
   const regexEnabled = regexCheckbox?.checked === true;
-  let count = 0;
+  const errorElement = document.querySelector("#search-replace-error");
 
   try {
-    count = regexEnabled
-      ? countLineRegexOccurrences(level0lField.value, searchInput.value)
-      : countLiteralOccurrences(level0lField.value, searchInput.value);
-    countElement.dataset.type = "info";
+    const matches = findSearchHighlights(level0lField.value, searchInput.value, regexEnabled, true);
+    const currentIndex = currentMatch === null
+      ? 0
+      : matches.findIndex((match) => match.index === currentMatch.index && match.length === currentMatch.length);
+    const position = matches.length === 0 ? 0 : (currentIndex < 0 ? 1 : currentIndex + 1);
+    countElement.textContent = `${position}/${matches.length}`;
+    countElement.setAttribute("aria-label", `Match ${position} of ${matches.length}`);
+    errorElement.textContent = "";
+    return matches.length;
   } catch {
-    countElement.dataset.type = "error";
-    countElement.textContent = "Invalid regular expression.";
-    return count;
+    countElement.textContent = "–/–";
+    countElement.setAttribute("aria-label", "Invalid regular expression");
+    errorElement.textContent = "Invalid regular expression.";
+    return 0;
   }
-
-  countElement.textContent = `Potential replacements: ${count}`;
-  return count;
 }
 
 function persistSearchReplaceState(searchInput, replaceInput, regexCheckbox) {
@@ -446,6 +460,26 @@ function autoResizeSearchReplaceTextarea(textarea) {
   textarea.style.height = "auto";
   const borderHeight = textarea.offsetHeight - textarea.clientHeight;
   textarea.style.height = `${textarea.scrollHeight + borderHeight}px`;
+}
+
+/**
+ * @param {(startIndex: number) => ({ index: number, length: number } | null)} findMatch
+ * @param {number} beforeIndex
+ * @returns {{ index: number, length: number } | null}
+ */
+function findPreviousSearchMatch(findMatch, beforeIndex) {
+  let previousMatch = null;
+  let searchStart = 0;
+
+  while (true) {
+    const match = findMatch(searchStart);
+    if (match === null || match.index >= beforeIndex) {
+      return previousMatch;
+    }
+
+    previousMatch = match;
+    searchStart = match.index + Math.max(match.length, 1);
+  }
 }
 
 function openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement, regexCheckbox) {
@@ -585,6 +619,7 @@ async function completeIncompleteRelationsForServerSwitch(level0lField, osmDataF
   }
 
   level0lField.value = mergeLoadedDataIntoEditorText(level0lField.value, result.addedData);
+  renderValidation(document.querySelector("#validation"), []);
   state.baseData = mergeBaseData(state.baseData, result.addedData);
   osmDataField.value = JSON.stringify(state.baseData, null, 2);
   state.mapController?.refreshFromText();
@@ -873,6 +908,7 @@ async function loadIntoEditor(urlInput, fileInput, osmDataField, level0lField, s
       level0lField.value = loadedText;
     }
 
+    renderValidation(document.querySelector("#validation"), []);
     state.mapController?.refreshFromText();
     if (mapView) {
       state.mapController?.setView(mapView.lat, mapView.lon, mapView.zoom);
@@ -1001,6 +1037,14 @@ function bindUploadControl(
   oscSectionElement,
   oscPreviewElement
 ) {
+  let uploadInProgress = false;
+
+  const setUploadInProgress = (inProgress) => {
+    uploadInProgress = inProgress;
+    uploadButton.disabled = inProgress;
+    splitUploadButton.disabled = inProgress;
+  };
+
   commentInput.addEventListener("input", () => {
     saveCommentDraft(state.serverConfig, commentInput.value);
   });
@@ -1015,6 +1059,10 @@ function bindUploadControl(
   });
 
   uploadButton.addEventListener("click", async () => {
+    if (uploadInProgress) {
+      return;
+    }
+    setUploadInProgress(true);
     try {
       const uploadData = buildUploadData(level0lField, validationElement);
       const pendingChanges = uploadData.filter((object) => object.action);
@@ -1051,12 +1099,18 @@ function bindUploadControl(
       );
     } catch (error) {
       setStatus(statusElement, error.message, "error");
+    } finally {
+      setUploadInProgress(false);
     }
   });
 
   splitUploadButton.addEventListener("click", async () => {
+    if (uploadInProgress) {
+      return;
+    }
+    setUploadInProgress(true);
     try {
-      const uploadData = buildUploadData(level0lField, validationElement);
+      const uploadData = buildUploadData(level0lField, validationElement, { rejectWarnings: true });
       const pendingChanges = uploadData.filter((object) => object.action);
 
       if (pendingChanges.length === 0) {
@@ -1118,6 +1172,7 @@ function bindUploadControl(
     } catch (error) {
       setStatus(statusElement, error.message, "error");
     } finally {
+      setUploadInProgress(false);
       state.mapController?.clearSplitPreview();
     }
   });
@@ -1168,6 +1223,7 @@ async function uploadPreparedDataInGroups(
       (object) => object.type !== "changeset" && !object.action
     );
     level0lField.value = dataToLevel0L(workingData);
+    renderValidation(document.querySelector("#validation"), []);
     state.mapController?.refreshFromText();
     persistWorkspaceState(urlInput, osmDataField, level0lField);
   }
@@ -1180,11 +1236,12 @@ async function uploadPreparedDataInGroups(
 function renderSplitPlanSummary(splitPlan) {
   const totalObjects = splitPlan.groupSummaries.reduce((sum, group) => sum + group.objectCount, 0);
   const groupCount = splitPlan.groupSummaries.length;
+  const objectLabel = totalObjects === 1 ? "object" : "objects";
 
   return {
     summary: groupCount > 1
-      ? `This upload will be split into ${groupCount} changeset(s) with ${totalObjects} object(s).`
-      : `This upload will be sent as one changeset with ${totalObjects} object(s).`,
+      ? `This upload will be split into ${groupCount} changesets with ${totalObjects} ${objectLabel}.`
+      : `This upload will be sent as one changeset with ${totalObjects} ${objectLabel}.`,
     items: splitPlan.groupSummaries.map((group, index) => ({
       index: index + 1,
       objectCount: group.objectCount,
@@ -1219,8 +1276,10 @@ function requestSplitUploadConfirmation(uploadData, baseData) {
   const cancelButton = document.querySelector("#split-preview-cancel");
   const confirmButton = document.querySelector("#split-preview-confirm");
   const maxGroupsInput = document.querySelector("#split-preview-max-groups");
+  const decreaseButton = document.querySelector("#split-preview-decrease");
+  const increaseButton = document.querySelector("#split-preview-increase");
 
-  if (!dialog || !summaryElement || !listElement || !closeButton || !cancelButton || !confirmButton || !maxGroupsInput) {
+  if (!dialog || !summaryElement || !listElement || !closeButton || !cancelButton || !confirmButton || !maxGroupsInput || !decreaseButton || !increaseButton) {
     return Promise.resolve(
       window.confirm("Upload split changesets?") ? buildUploadSplitPlan(uploadData, baseData, {
         maxGroups: 6,
@@ -1230,6 +1289,7 @@ function requestSplitUploadConfirmation(uploadData, baseData) {
   }
 
   let currentPlan = null;
+  let lastValidMaxGroups = 6;
 
   const renderPlan = (splitPlan) => {
     const preview = renderSplitPlanSummary(splitPlan);
@@ -1237,7 +1297,8 @@ function requestSplitUploadConfirmation(uploadData, baseData) {
     listElement.replaceChildren(
       ...preview.items.map((item) => {
         const li = document.createElement("li");
-        li.textContent = `Part ${item.index}: ${item.objectCount} object(s), ${formatSplitBbox(item.bbox)}`;
+        const objectLabel = item.objectCount === 1 ? "object" : "objects";
+        li.textContent = `Part ${item.index}: ${item.objectCount} ${objectLabel}, ${formatSplitBbox(item.bbox)}`;
         return li;
       })
     );
@@ -1251,6 +1312,9 @@ function requestSplitUploadConfirmation(uploadData, baseData) {
     }
     const maxGroups = clampSplitGroupLimit(maxGroupsInput.value);
     maxGroupsInput.value = String(maxGroups);
+    lastValidMaxGroups = maxGroups;
+    decreaseButton.disabled = maxGroups <= 1;
+    increaseButton.disabled = maxGroups >= 10;
     currentPlan = buildUploadSplitPlan(uploadData, baseData, {
       maxGroups,
       minSplitSizeKm: 10
@@ -1276,6 +1340,8 @@ function requestSplitUploadConfirmation(uploadData, baseData) {
       dialog.removeEventListener("cancel", onCancel);
       maxGroupsInput.removeEventListener("input", onInput);
       maxGroupsInput.removeEventListener("change", onInput);
+      decreaseButton.removeEventListener("click", onDecrease);
+      increaseButton.removeEventListener("click", onIncrease);
       closeButton.removeEventListener("click", onCancelClick);
       cancelButton.removeEventListener("click", onCancelClick);
       confirmButton.removeEventListener("click", onConfirmClick);
@@ -1286,6 +1352,14 @@ function requestSplitUploadConfirmation(uploadData, baseData) {
     const onInput = () => {
       refreshPlan();
     };
+
+    const adjustMaxGroups = (amount) => {
+      const current = maxGroupsInput.value ? clampSplitGroupLimit(maxGroupsInput.value) : lastValidMaxGroups;
+      maxGroupsInput.value = String(clampSplitGroupLimit(current + amount));
+      refreshPlan();
+    };
+    const onDecrease = () => adjustMaxGroups(-1);
+    const onIncrease = () => adjustMaxGroups(1);
 
     const onConfirmClick = () => {
       dialog.close?.("confirm");
@@ -1309,12 +1383,14 @@ function requestSplitUploadConfirmation(uploadData, baseData) {
     dialog.addEventListener("cancel", onCancel, { once: true });
     maxGroupsInput.addEventListener("input", onInput);
     maxGroupsInput.addEventListener("change", onInput);
+    decreaseButton.addEventListener("click", onDecrease);
+    increaseButton.addEventListener("click", onIncrease);
     closeButton.addEventListener("click", onCancelClick, { once: true });
     cancelButton.addEventListener("click", onCancelClick, { once: true });
     confirmButton.addEventListener("click", onConfirmClick, { once: true });
 
-    if (typeof dialog.showModal === "function") {
-      dialog.showModal();
+    if (typeof dialog.show === "function") {
+      dialog.show();
       return;
     }
 
@@ -1356,6 +1432,9 @@ function bindSearchReplaceControl(
   replaceInput,
   regexCheckbox,
   countElement,
+  previousButton,
+  nextButton,
+  replaceButton,
   applyButton,
   level0lField,
   urlInput,
@@ -1365,7 +1444,93 @@ function bindSearchReplaceControl(
   oscSectionElement,
   oscPreviewElement
 ) {
-  const refreshCount = () => updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox);
+  const highlights = document.querySelector("#editor-highlights");
+  const editorColumn = level0lField.parentElement;
+  let navigatedMatch = null;
+  const syncHighlightSizeAndScroll = () => {
+    highlights.style.left = `${level0lField.offsetLeft + level0lField.clientLeft}px`;
+    highlights.style.top = `${level0lField.offsetTop + level0lField.clientTop}px`;
+    highlights.style.width = `${level0lField.clientWidth}px`;
+    highlights.style.height = `${level0lField.clientHeight}px`;
+    highlights.scrollTop = level0lField.scrollTop;
+    highlights.scrollLeft = level0lField.scrollLeft;
+  };
+  const refreshHighlights = () => {
+    let matches = [];
+    let replaceTarget = null;
+    if (!panelWrap.hidden) {
+      try {
+        matches = findSearchHighlights(level0lField.value, searchInput.value, regexCheckbox.checked);
+        replaceTarget = navigatedMatch ?? (regexCheckbox.checked
+          ? findLineRegexMatch(level0lField.value, searchInput.value)
+          : findLiteralMatch(level0lField.value, searchInput.value));
+      } catch {
+        // Invalid expressions are reported by the match counter.
+      }
+    }
+    const validationLines = new Map();
+    for (const [isError, line] of state.validation ?? []) {
+      if (isError || !validationLines.has(line)) {
+        validationLines.set(line, isError ? "validation-error" : "validation-warning");
+      }
+    }
+    const hasHighlights = matches.length > 0 || validationLines.size > 0;
+    highlights.hidden = !hasHighlights;
+    editorColumn.classList.toggle("is-highlighting", hasHighlights);
+    if (!hasHighlights) {
+      highlights.replaceChildren();
+      return;
+    }
+
+    const text = level0lField.value;
+    const fragment = document.createDocumentFragment();
+    let lineStart = 0;
+    let matchIndex = 0;
+    const lines = text.split("\n");
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+      const lineEnd = lineStart + lines[lineIndex].length;
+      const line = document.createElement("span");
+      const severity = validationLines.get(lineIndex);
+      if (severity) {
+        line.className = severity;
+      }
+      let offset = lineStart;
+      while (matchIndex < matches.length && matches[matchIndex].index < lineEnd) {
+        const match = matches[matchIndex];
+        const start = Math.max(offset, match.index);
+        const end = Math.min(lineEnd, match.index + match.length);
+        line.append(document.createTextNode(text.slice(offset, start)));
+        const mark = document.createElement("mark");
+        if (replaceTarget?.index === match.index && replaceTarget.length === match.length) {
+          mark.classList.add("replace-target");
+        }
+        mark.textContent = text.slice(start, end);
+        line.append(mark);
+        offset = end;
+        if (match.index + match.length > lineEnd) {
+          break;
+        }
+        matchIndex += 1;
+      }
+      line.append(document.createTextNode(text.slice(offset, lineEnd)));
+      fragment.append(line, document.createTextNode("\n"));
+      while (matchIndex < matches.length && matches[matchIndex].index + matches[matchIndex].length <= lineEnd + 1) {
+        matchIndex += 1;
+      }
+      lineStart = lineEnd + 1;
+    }
+    highlights.replaceChildren(fragment);
+    syncHighlightSizeAndScroll();
+  };
+  state.refreshEditorHighlights = refreshHighlights;
+  const refreshCount = () => {
+    updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox, navigatedMatch);
+    refreshHighlights();
+  };
+  level0lField.addEventListener("scroll", syncHighlightSizeAndScroll);
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(syncHighlightSizeAndScroll).observe(level0lField);
+  }
   const resizeFields = () => {
     autoResizeSearchReplaceTextarea(searchInput);
     autoResizeSearchReplaceTextarea(replaceInput);
@@ -1375,24 +1540,53 @@ function bindSearchReplaceControl(
   searchInput.value = persistedSearchReplaceState.searchValue;
   replaceInput.value = persistedSearchReplaceState.replaceValue;
   regexCheckbox.checked = persistedSearchReplaceState.regexEnabled;
+  let previousSearchValue = searchInput.value;
+  let regexEnabledByTrailingDollar = false;
+  let regexAutomaticallyEnabled = false;
+  let automaticRegexSuppressed = false;
 
   openButton.setAttribute("aria-expanded", "false");
 
   openButton.addEventListener("click", () => {
     openSearchReplacePanel(openButton, panelWrap, searchInput, level0lField, countElement, regexCheckbox);
+    automaticRegexSuppressed = false;
+    regexAutomaticallyEnabled = false;
+    if (searchInput.value !== previousSearchValue) {
+      previousSearchValue = searchInput.value;
+      regexEnabledByTrailingDollar = false;
+    }
+    navigatedMatch = null;
     resizeFields();
+    refreshCount();
     persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
   });
 
   closeButton.addEventListener("click", () => {
     closeSearchReplacePanel(openButton, panelWrap);
+    refreshHighlights();
   });
 
   backdrop.addEventListener("click", () => {
     closeSearchReplacePanel(openButton, panelWrap);
+    refreshHighlights();
   });
 
   searchInput.addEventListener("input", () => {
+    navigatedMatch = null;
+    if (!automaticRegexSuppressed) {
+      const wasEnabled = regexCheckbox.checked;
+      const regexMode = updateAutomaticRegexMode(
+        previousSearchValue, searchInput.value, wasEnabled, regexEnabledByTrailingDollar
+      );
+      if (!wasEnabled && regexMode.enabled) {
+        regexAutomaticallyEnabled = true;
+      } else if (!regexMode.enabled) {
+        regexAutomaticallyEnabled = false;
+      }
+      regexCheckbox.checked = regexMode.enabled;
+      regexEnabledByTrailingDollar = regexMode.enabledByTrailingDollar;
+    }
+    previousSearchValue = searchInput.value;
     autoResizeSearchReplaceTextarea(searchInput);
     persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
     refreshCount();
@@ -1403,12 +1597,81 @@ function bindSearchReplaceControl(
     refreshCount();
   });
   regexCheckbox.addEventListener("change", () => {
+    navigatedMatch = null;
+    if (!regexCheckbox.checked && regexAutomaticallyEnabled) {
+      automaticRegexSuppressed = true;
+    }
+    regexAutomaticallyEnabled = false;
+    regexEnabledByTrailingDollar = false;
     persistSearchReplaceState(searchInput, replaceInput, regexCheckbox);
     refreshCount();
   });
-  level0lField.addEventListener("input", refreshCount);
+  level0lField.addEventListener("input", () => {
+    navigatedMatch = null;
+    if (state.validation?.length) {
+      renderValidation(validationElement, []);
+    }
+    refreshCount();
+  });
 
-  applyButton.addEventListener("click", () => {
+  const moveToMatch = (direction) => {
+    const search = searchInput.value;
+    if (search.length === 0) {
+      setStatus(statusElement, "Enter text to search for.", "error");
+      return;
+    }
+
+    const regexEnabled = regexCheckbox.checked;
+    const findMatch = (startIndex) => regexEnabled
+      ? findLineRegexMatch(level0lField.value, search, startIndex)
+      : findLiteralMatch(level0lField.value, search, startIndex);
+    try {
+      const current = navigatedMatch ?? findMatch(0);
+      if (current === null) {
+        setStatus(statusElement, "No matches found.");
+        return;
+      }
+      const match = direction === "next"
+        ? (findMatch(current.index + Math.max(current.length, 1)) ?? findMatch(0))
+        : (findPreviousSearchMatch(findMatch, current.index)
+          ?? findPreviousSearchMatch(findMatch, level0lField.value.length + 1));
+
+      if (match === null) {
+        setStatus(statusElement, "No matches found.");
+        return;
+      }
+
+      navigatedMatch = match;
+      refreshCount();
+      level0lField.focus();
+      level0lField.setSelectionRange(match.index, match.index + match.length);
+    } catch (error) {
+      setStatus(statusElement, error.message, "error");
+    }
+  };
+
+  for (const button of [previousButton, nextButton]) {
+    button.addEventListener("pointerdown", (event) => {
+      if (event.button === 0 && document.activeElement === level0lField) {
+        event.preventDefault();
+      }
+    });
+    button.addEventListener("mousedown", (event) => {
+      if (event.button === 0 && document.activeElement === level0lField) {
+        event.preventDefault();
+      }
+    });
+  }
+
+  previousButton.addEventListener("click", () => {
+    moveToMatch("previous");
+  });
+
+  nextButton.addEventListener("click", () => {
+    moveToMatch("next");
+  });
+
+  const replaceMatches = (replaceAll) => {
     const search = searchInput.value;
     if (search.length === 0) {
       setStatus(statusElement, "Enter text to search for.", "error");
@@ -1434,16 +1697,61 @@ function bindSearchReplaceControl(
       return;
     }
 
-    level0lField.value = regexEnabled
-      ? replaceAllLineRegex(level0lField.value, search, replaceInput.value)
-      : replaceAllLiteral(level0lField.value, search, replaceInput.value);
+    const originalText = level0lField.value;
+    const replacedMatch = replaceAll
+      ? null
+      : (navigatedMatch ?? (regexEnabled
+        ? findLineRegexMatch(originalText, search)
+        : findLiteralMatch(originalText, search)));
+
+    const updatedText = replaceAll
+      ? (regexEnabled
+        ? replaceAllLineRegex(originalText, search, replaceInput.value)
+        : replaceAllLiteral(originalText, search, replaceInput.value))
+      : replaceSearchMatch(originalText, search, replaceInput.value, regexEnabled, replacedMatch);
+
+    if (updatedText !== originalText) {
+      level0lField.focus();
+      level0lField.setSelectionRange(0, originalText.length);
+      const applied = updatedText.length > 0
+        ? document.execCommand("insertText", false, updatedText)
+        : document.execCommand("delete");
+
+      if (!applied) {
+        level0lField.setSelectionRange(0, 0);
+        setStatus(statusElement, "Could not replace text with undo support in this browser.", "error");
+        return;
+      }
+    }
     state.mapController?.refreshFromText();
     state.oscPreview = "";
     renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
     renderValidation(validationElement, []);
     persistWorkspaceState(urlInput, osmDataField, level0lField);
     refreshCount();
-    setStatus(statusElement, `Replaced ${occurrences} occurrence(s).`, "success");
+    setStatus(statusElement, `Replaced ${replaceAll ? occurrences : 1} occurrence(s).`, "success");
+
+    if (!replaceAll && replacedMatch !== null) {
+      const suffixLength = originalText.length - (replacedMatch.index + replacedMatch.length);
+      const nextSearchStart = level0lField.value.length - suffixLength;
+      const nextMatch = regexEnabled
+        ? findLineRegexMatch(level0lField.value, search, nextSearchStart)
+        : findLiteralMatch(level0lField.value, search, nextSearchStart);
+      navigatedMatch = nextMatch;
+      refreshCount();
+      const caretPosition = nextMatch?.index ?? nextSearchStart;
+
+      level0lField.focus();
+      level0lField.setSelectionRange(caretPosition, caretPosition);
+    }
+  };
+
+  replaceButton.addEventListener("click", () => {
+    replaceMatches(false);
+  });
+
+  applyButton.addEventListener("click", () => {
+    replaceMatches(true);
   });
 
   refreshCount();
@@ -1472,6 +1780,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const searchReplaceReplaceInput = document.querySelector("#search-replace-replace");
   const searchReplaceRegexCheckbox = document.querySelector("#search-replace-regex");
   const searchReplaceCount = document.querySelector("#search-replace-count");
+  const searchReplacePreviousButton = document.querySelector("#search-replace-previous");
+  const searchReplaceNextButton = document.querySelector("#search-replace-next");
+  const searchReplaceButton = document.querySelector("#search-replace-one");
   const searchReplaceApplyButton = document.querySelector("#search-replace-apply");
   const commentHistoryElement = document.querySelector("#comment-history");
   const urlInput = document.querySelector("#url-input");
@@ -1607,6 +1918,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     searchReplaceReplaceInput,
     searchReplaceRegexCheckbox,
     searchReplaceCount,
+    searchReplacePreviousButton,
+    searchReplaceNextButton,
+    searchReplaceButton,
     searchReplaceApplyButton,
     level0lField,
     urlInput,

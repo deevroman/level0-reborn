@@ -13,7 +13,7 @@ function shouldRetry(url, reason, confirmImpl) {
 }
 
 /**
- * Performs a request and offers the user a retry after a network failure or HTTP 503 response.
+ * Performs a request and offers the user a retry after a network failure or HTTP 502/503 response.
  *
  * @param {string} url
  * @param {RequestInit | undefined} options
@@ -37,7 +37,7 @@ export async function fetchWithRetry(url, options, fetchImpl = fetch, confirmImp
       continue;
     }
 
-    if (response.status !== 503 || !shouldRetry(requestUrl, "The server returned HTTP 503", confirmImpl)) {
+    if (![502, 503].includes(response.status) || !shouldRetry(requestUrl, `The server returned HTTP ${response.status}`, confirmImpl)) {
       return response;
     }
   }
