@@ -1426,7 +1426,6 @@ function logSplitProgress(step, totalSteps, group, changesetId) {
 function bindSearchReplaceControl(
   openButton,
   panelWrap,
-  backdrop,
   closeButton,
   searchInput,
   replaceInput,
@@ -1566,9 +1565,11 @@ function bindSearchReplaceControl(
     refreshHighlights();
   });
 
-  backdrop.addEventListener("click", () => {
-    closeSearchReplacePanel(openButton, panelWrap);
-    refreshHighlights();
+  document.addEventListener("click", (event) => {
+    if (!panelWrap.hidden && !panelWrap.contains(event.target) && !openButton.contains(event.target)) {
+      closeSearchReplacePanel(openButton, panelWrap);
+      refreshHighlights();
+    }
   });
 
   searchInput.addEventListener("input", () => {
@@ -1774,7 +1775,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const splitUploadButton = document.querySelector("#split-upload");
   const searchReplaceOpenButton = document.querySelector("#search-replace-open");
   const searchReplacePanelWrap = document.querySelector("#search-replace-panel-wrap");
-  const searchReplaceBackdrop = document.querySelector(".search-replace-backdrop");
   const searchReplaceCloseButton = document.querySelector("#search-replace-close");
   const searchReplaceSearchInput = document.querySelector("#search-replace-search");
   const searchReplaceReplaceInput = document.querySelector("#search-replace-replace");
@@ -1912,7 +1912,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindSearchReplaceControl(
     searchReplaceOpenButton,
     searchReplacePanelWrap,
-    searchReplaceBackdrop,
     searchReplaceCloseButton,
     searchReplaceSearchInput,
     searchReplaceReplaceInput,

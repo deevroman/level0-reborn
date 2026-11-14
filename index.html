@@ -543,18 +543,6 @@
       z-index: 3100;
     }
 
-    .search-replace-backdrop {
-      display: none;
-    }
-
-    .search-replace.open .search-replace-backdrop {
-      position: fixed;
-      inset: 0;
-      display: block;
-      background: transparent;
-      z-index: 3100;
-    }
-
     .search-replace-panel {
       display: none;
     }
@@ -1147,8 +1135,7 @@
 
     <div class="toolbar-actions">
       <div class="search-replace" id="search-replace-panel-wrap" hidden>
-        <span class="search-replace-backdrop" aria-hidden="true"></span>
-        <div class="search-replace-panel" role="dialog" aria-labelledby="search-replace-title" aria-modal="true">
+        <div class="search-replace-panel" role="dialog" aria-labelledby="search-replace-title">
           <div class="search-replace-header">
             <h3 id="search-replace-title">Search and replace</h3>
             <button id="search-replace-close" class="search-replace-close" type="button" aria-label="Close">×</button>
