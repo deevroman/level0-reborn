@@ -60,12 +60,28 @@ export const BUILTIN_SERVER_PRESETS = {
 
 export const DEFAULT_SERVER_PRESET_ID = "osm";
 
-function normalizeBaseLayer(baseLayer, fallback) {
-  return {
-    name: baseLayer?.name?.trim?.() || fallback.name,
-    tileUrl: baseLayer?.tileUrl?.trim?.() || fallback.tileUrl,
-    attribution: baseLayer?.attribution?.trim?.() || fallback.attribution
-  };
+/**
+ * @param {{tileUrl?: string} | undefined} baseLayer Saved layer settings.
+ * @param {{name: string, tileUrl: string, attribution: string}} fallback Preset layer.
+ * @param {boolean} custom Whether the layer belongs to a custom server.
+ * @returns {{name: string, tileUrl: string, attribution: string}} Normalized layer.
+ */
+function normalizeBaseLayer(baseLayer, fallback, custom) {
+  const tileUrl = baseLayer?.tileUrl?.trim?.() || fallback.tileUrl;
+  if (!custom || tileUrl === fallback.tileUrl) {
+    return { ...fallback, tileUrl };
+  }
+  if (tileUrl === OPEN_GEOFICTION_BASE_LAYER.tileUrl) {
+    return { ...OPEN_GEOFICTION_BASE_LAYER };
+  }
+
+  let domain = "unknown host";
+  try {
+    domain = new URL(tileUrl).hostname;
+  } catch {
+    // Keep the entered URL so it can be corrected in the settings.
+  }
+  return { name: "Custom", tileUrl, attribution: `tiles from ${domain}` };
 }
 
 function trimTrailingSlash(value) {
@@ -88,7 +104,7 @@ export function normalizeServerConfig(config) {
     tokenEndpoint: OAUTH_TOKEN_ENDPOINT,
     revokeEndpoint: OAUTH_REVOKE_ENDPOINT,
     clientId: config.clientId ?? fallback.clientId,
-    defaultBaseLayer: normalizeBaseLayer(config.defaultBaseLayer, fallback.defaultBaseLayer)
+    defaultBaseLayer: normalizeBaseLayer(config.defaultBaseLayer, fallback.defaultBaseLayer, presetId === "custom")
   };
 }
 

@@ -385,9 +385,7 @@ function renderServerSettings(formElements, serverConfig) {
   formElements.siteUrlInput.value = serverConfig.siteUrl;
   formElements.apiBaseInput.value = serverConfig.apiBase;
   formElements.clientIdInput.value = serverConfig.clientId;
-  formElements.defaultBaseLayerNameInput.value = serverConfig.defaultBaseLayer.name;
   formElements.defaultBaseLayerUrlInput.value = serverConfig.defaultBaseLayer.tileUrl;
-  formElements.defaultBaseLayerAttributionInput.value = serverConfig.defaultBaseLayer.attribution;
   formElements.tokenInput.value = getStoredAccessToken(serverConfig) ?? "";
   formElements.serverLabel.textContent = serverConfig.name;
   syncServerSettingsLocks(formElements, serverConfig);
@@ -693,9 +691,7 @@ function readServerSettings(formElements, presetOverride = formElements.presetSe
     apiBase: formElements.apiBaseInput.value,
     clientId: formElements.clientIdInput.value,
     defaultBaseLayer: {
-      name: formElements.defaultBaseLayerNameInput.value,
-      tileUrl: formElements.defaultBaseLayerUrlInput.value,
-      attribution: formElements.defaultBaseLayerAttributionInput.value
+      tileUrl: formElements.defaultBaseLayerUrlInput.value
     }
   });
 }
@@ -893,8 +889,8 @@ function bindServerSettings(
       state.serverConfig = readServerSettings(formElements, "custom");
     } else {
       state.serverConfig = normalizeServerConfig(BUILTIN_SERVER_PRESETS[formElements.presetSelect.value]);
-      renderServerSettings(formElements, state.serverConfig);
     }
+    renderServerSettings(formElements, state.serverConfig);
 
     saveServerConfig(state.serverConfig);
     state.mapController?.setDefaultBaseLayer(state.serverConfig.defaultBaseLayer);
@@ -919,9 +915,13 @@ function bindServerSettings(
   for (const input of formElements.editableInputs) {
     input.addEventListener("change", async () => {
       formElements.presetSelect.value = "custom";
+      const previousTileUrl = state.serverConfig.defaultBaseLayer.tileUrl;
       state.serverConfig = readServerSettings(formElements, "custom");
       saveServerConfig(state.serverConfig);
       renderServerSettings(formElements, state.serverConfig);
+      if (state.serverConfig.defaultBaseLayer.tileUrl !== previousTileUrl) {
+        state.mapController?.setDefaultBaseLayer(state.serverConfig.defaultBaseLayer);
+      }
       syncCommentDraft(formElements.commentInput);
       renderCommentHistory(commentHistoryElement);
       await syncLoginStateForCurrentServer(loginButton);
@@ -1976,9 +1976,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     siteUrlInput: document.querySelector("#server-site-url"),
     apiBaseInput: document.querySelector("#server-api-base"),
     clientIdInput: document.querySelector("#oauth-client-id"),
-    defaultBaseLayerNameInput: document.querySelector("#default-base-layer-name"),
     defaultBaseLayerUrlInput: document.querySelector("#default-base-layer-url"),
-    defaultBaseLayerAttributionInput: document.querySelector("#default-base-layer-attribution"),
     tokenInput: document.querySelector("#oauth-token"),
     themeSelect: document.querySelector("#theme-select"),
     serverLabel: document.querySelector("#current-server-label"),
@@ -1989,18 +1987,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     serverFormElements.siteUrlInput,
     serverFormElements.apiBaseInput,
     serverFormElements.clientIdInput,
-    serverFormElements.defaultBaseLayerNameInput,
-    serverFormElements.defaultBaseLayerUrlInput,
-    serverFormElements.defaultBaseLayerAttributionInput
+    serverFormElements.defaultBaseLayerUrlInput
   ];
   serverFormElements.lockableInputs = [
     serverFormElements.nameInput,
     serverFormElements.siteUrlInput,
     serverFormElements.apiBaseInput,
     serverFormElements.clientIdInput,
-    serverFormElements.defaultBaseLayerNameInput,
-    serverFormElements.defaultBaseLayerUrlInput,
-    serverFormElements.defaultBaseLayerAttributionInput
+    serverFormElements.defaultBaseLayerUrlInput
   ];
 
   applyThemePreference(loadThemePreference());

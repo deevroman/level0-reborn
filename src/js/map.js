@@ -213,11 +213,11 @@ export function initMapEditor({
     baseLayerControl = leaflet.control.layers(baseLayers, {}, { collapsed: true }).addTo(map);
   }
 
+  leaflet.control.attribution({ prefix: null }).addTo(map);
   setDefaultBaseLayer(defaultBaseLayer);
   map.on("baselayerchange", ({ layer }) => {
     activeBaseLayer = layer;
   });
-  leaflet.control.attribution({ prefix: null }).addTo(map);
 
   const marker = leaflet.marker(map.getCenter(), { draggable: true }).addTo(map);
   const objectWays = leaflet.layerGroup().addTo(map);

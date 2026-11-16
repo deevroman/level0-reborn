@@ -39,13 +39,26 @@ test("normalizeServerConfig keeps custom overrides normalized", () => {
   assert.equal(config.siteUrl, "https://example.test");
   assert.equal(config.apiBase, "https://api.example.test/api/0.6/");
   assert.deepEqual(config.defaultBaseLayer, {
-    name: "Example tiles",
+    name: "Custom",
     tileUrl: "https://tiles.example.test/{z}/{x}/{y}.png",
-    attribution: "Example attribution"
+    attribution: "tiles from tiles.example.test"
   });
   assert.equal(resolveServerEndpoint(config, config.authorizationEndpoint), "https://example.test/oauth2/authorize");
   assert.equal(resolveServerEndpoint(config, config.tokenEndpoint), "https://example.test/oauth2/token");
   assert.equal(resolveServerEndpoint(config, config.revokeEndpoint), "https://example.test/oauth2/revoke");
   assert.equal(config.redirectUri, undefined);
   assert.equal(config.scope, undefined);
+});
+
+test("custom tile settings derive attribution from the URL and retain preset credits", () => {
+  const layer = normalizeServerConfig({
+    presetId: "custom",
+    defaultBaseLayer: { tileUrl: "https://{s}.tiles.example.org/{z}/{x}/{y}.png" }
+  }).defaultBaseLayer;
+  assert.equal(layer.name, "Custom");
+  assert.equal(layer.attribution, "tiles from {s}.tiles.example.org");
+  assert.deepEqual(normalizeServerConfig({ presetId: "custom", defaultBaseLayer: layer }).defaultBaseLayer, layer);
+
+  const ogfLayer = getPresetServerConfig("ogf").defaultBaseLayer;
+  assert.deepEqual(normalizeServerConfig({ presetId: "custom", defaultBaseLayer: ogfLayer }).defaultBaseLayer, ogfLayer);
 });
