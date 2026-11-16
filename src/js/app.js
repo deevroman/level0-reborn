@@ -72,14 +72,14 @@ const state = {
 function loadThemePreference() {
   try {
     const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    return storedTheme === "light" || storedTheme === "dark" ? storedTheme : "auto";
+    return ["light", "dark", "sepia"].includes(storedTheme) ? storedTheme : "auto";
   } catch {
     return "auto";
   }
 }
 
 function applyThemePreference(theme) {
-  if (theme === "light" || theme === "dark") {
+  if (["light", "dark", "sepia"].includes(theme)) {
     document.documentElement.dataset.theme = theme;
   } else {
     delete document.documentElement.dataset.theme;
@@ -88,7 +88,7 @@ function applyThemePreference(theme) {
 
 function saveThemePreference(theme) {
   try {
-    if (theme === "light" || theme === "dark") {
+    if (["light", "dark", "sepia"].includes(theme)) {
       localStorage.setItem(THEME_STORAGE_KEY, theme);
     } else {
       localStorage.removeItem(THEME_STORAGE_KEY);

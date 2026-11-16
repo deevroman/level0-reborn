@@ -11,7 +11,7 @@
     (() => {
       try {
         const storedTheme = localStorage.getItem("theme_preference_v1");
-        if (storedTheme === "light" || storedTheme === "dark") {
+        if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "sepia") {
           document.documentElement.dataset.theme = storedTheme;
         }
       } catch {}
@@ -49,7 +49,7 @@
     }
 
     @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
+      :root:not([data-theme]) {
         color-scheme: dark;
         --border: #5d564d;
         --panel: #24201c;
@@ -102,6 +102,33 @@
       --panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
       --map-placeholder-text: #d4ccc1;
       --map-placeholder-bg: #2b2824;
+    }
+
+    :root[data-theme="sepia"] {
+      color-scheme: light;
+      --border: #b9a486;
+      --panel: #e8ddc7;
+      --error: #952f24;
+      --info: #634d2e;
+      --success: #46603a;
+      --text: #423426;
+      --background: #f3ead7;
+      --surface: #fbf4e4;
+      --surface-muted: #f5ebd7;
+      --overlay-surface: #f8efdc;
+      --control-bg: #fff8e9;
+      --link: #74502a;
+      --project-mark-border: rgba(66, 52, 38, 0.3);
+      --project-mark-bg: rgba(100, 72, 39, 0.06);
+      --project-mark-text: rgba(66, 52, 38, 0.85);
+      --project-mark-border-hover: rgba(66, 52, 38, 0.55);
+      --project-mark-bg-hover: rgba(100, 72, 39, 0.12);
+      --project-mark-text-hover: #423426;
+      --dialog-shadow: 0 16px 42px rgba(66, 45, 24, 0.2);
+      --dialog-backdrop: rgba(66, 45, 24, 0.3);
+      --panel-shadow: 0 8px 24px rgba(66, 45, 24, 0.16);
+      --map-placeholder-text: #65533d;
+      --map-placeholder-bg: #e9ddc6;
     }
 
     * {
@@ -1268,6 +1295,7 @@
                 <option value="auto">Auto</option>
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
+                <option value="sepia">Sepia</option>
               </select>
             </label>
             <label>
