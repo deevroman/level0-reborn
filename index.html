@@ -501,6 +501,19 @@
       display: contents;
     }
 
+    #diff-toggle {
+      display: inline-grid;
+      place-items: center;
+    }
+
+    #diff-toggle span,
+    #diff-toggle::after { grid-area: 1 / 1; }
+
+    #diff-toggle::after {
+      content: "Show changes";
+      visibility: hidden;
+    }
+
     .toolbar-actions details {
       margin: 0;
     }
@@ -816,7 +829,35 @@
       display: flex;
       gap: 12px;
       align-items: flex-start;
+      position: relative;
     }
+
+    .diff-panel:not([hidden]) {
+      position: absolute;
+      inset: 0;
+      z-index: 1500;
+      display: flex;
+      flex-direction: column;
+      min-height: 500px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .diff-panel-labels { position: sticky; top: 0; z-index: 1; display: flex; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .diff-panel-labels span { width: 50%; padding: 6px 10px; font-weight: bold; }
+    .diff-panel-labels span + span { border-left: 1px solid var(--border); }
+    .diff-panel-content { flex: 1; min-height: 0; overflow: hidden; }
+    .diff-panel-content .cm-mergeView { height: 100%; overflow: auto; }
+    .diff-panel-content .cm-mergeViewEditor { min-width: 0; }
+    .diff-panel-content .cm-mergeViewEditor + .cm-mergeViewEditor { box-shadow: inset 1px 0 var(--border); }
+    .diff-panel-content .cm-editor { color: var(--text); background: var(--surface); }
+    .diff-panel-content .cm-gutters { color: var(--text); background: var(--surface-muted); border: 0; }
+    .diff-panel-content .cm-scroller { overflow: auto; font-size: 0.95rem; }
+    #diff-content .cm-editor.cm-merge-a .cm-changedLine { background: rgba(220, 70, 65, 0.16); }
+    #diff-content .cm-editor.cm-merge-b .cm-changedLine { background: rgba(60, 170, 85, 0.16); }
+    #diff-content .cm-editor.cm-merge-a .cm-changedText { background: rgba(220, 70, 65, 0.58); }
+    #diff-content .cm-editor.cm-merge-b .cm-changedText { background: rgba(60, 170, 85, 0.58); }
 
     .editor-column {
       flex: 1 1 auto;
@@ -955,6 +996,15 @@
 
     #osc-section[hidden] {
       display: none;
+    }
+
+    #osc-section:not([open]) #osc-preview {
+      display: none;
+    }
+
+    #osc-section summary {
+      font-size: 1.1rem;
+      font-weight: 700;
     }
 
     @media (max-width: 900px) {
@@ -1356,7 +1406,7 @@
     </div>
 <!--    <button id="check" type="button" disabled>Check for conflicts</button>-->
     <div class="toolbar-button-pair">
-      <button id="show-osc" type="button">Show osmChange</button>
+      <button id="diff-toggle" type="button" aria-expanded="false" aria-controls="diff-panel"><span>Show changes</span></button>
       <button id="search-replace-open" type="button">Search and replace</button>
     </div>
     <span class="toolbar-break comment-break" aria-hidden="true"></span>
@@ -1376,6 +1426,10 @@
 <p id="status" class="message-log"></p>
 
 <div class="layout">
+  <section id="diff-panel" class="diff-panel" aria-label="Changes" hidden>
+    <div class="diff-panel-labels"><span>Before</span><span>After</span></div>
+    <div id="diff-content" class="diff-panel-content"></div>
+  </section>
   <div class="editor-column">
     <div id="editor-highlights" class="editor-highlights" aria-hidden="true" hidden></div>
     <textarea id="level0l" aria-label="Level0L editor"></textarea>
@@ -1405,13 +1459,13 @@
 
 <div id="validation" class="validation-list"></div>
 
-<section id="osc-section" hidden>
-  <h2 id="osmchange">OsmChange contents (this will be uploaded to the server)</h2>
+<details id="osc-section" class="secondary-tools" hidden>
+  <summary id="osmchange">osmChange</summary>
   <pre id="osc-preview"></pre>
-</section>
+</details>
 
 <details class="secondary-tools">
-  <summary>Debug data</summary>
+  <summary>debug data</summary>
   <div class="secondary-tools-content">
     <textarea id="osmdata" aria-label="Source data"></textarea>
     <p style="margin-top: 10px;">

@@ -31,6 +31,7 @@ p.s. Let me know if you are interested in this editor or some features
 
 - `npm test`
 - `npm run lint`
+- `npm run build:diff` rebuilds the locally bundled CodeMirror diff viewer after updating its dependencies.
 - `src/js/app.js` wires DOM, auth flow and data loading.
 - `src/js/overpass.js` converts Overpass JSON into Level0L text.
 - `src/js/level0l.js` parses Level0L and builds `osmChange`.

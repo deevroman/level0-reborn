@@ -331,7 +331,7 @@ function renderValidation(validationElement, validation) {
 }
 
 function renderOscPreview(sectionElement, previewElement, oscText) {
-  sectionElement.hidden = oscText.length === 0;
+  sectionElement.hidden = oscText.length === 0 || document.querySelector("#diff-panel").hidden;
   previewElement.textContent = oscText;
 }
 
@@ -587,6 +587,72 @@ function bindWorkspacePersistence(urlInput, osmDataField, level0lField) {
   urlInput.addEventListener("input", save);
   osmDataField.addEventListener("input", save);
   level0lField.addEventListener("input", save);
+}
+
+/**
+ * @param {HTMLButtonElement} toggleButton Button that opens or closes the diff.
+ * @param {HTMLElement} panel Overlay containing the comparison.
+ * @param {HTMLElement} content Container for the CodeMirror view.
+ * @param {HTMLTextAreaElement} editor Current editor text.
+ * @param {HTMLInputElement} urlInput URL input.
+ * @param {HTMLTextAreaElement} osmDataField Source data.
+ * @param {HTMLElement} statusElement Status message container.
+ * @param {HTMLElement} validationElement Validation message container.
+ * @param {HTMLElement} oscSectionElement osmChange preview section.
+ * @param {HTMLElement} oscPreviewElement osmChange text container.
+ */
+function bindDiffControl(toggleButton, panel, content, editor, urlInput, osmDataField, statusElement, validationElement, oscSectionElement, oscPreviewElement) {
+  let view = null;
+  let opening = false;
+  const buttonLabel = toggleButton.querySelector("span");
+  const coveredElements = [editor.parentElement, document.querySelector(".sidebar")];
+  const labels = panel.querySelector(".diff-panel-labels");
+  const close = () => {
+    panel.hidden = true;
+    oscSectionElement.hidden = true;
+    for (const element of coveredElements) element.inert = false;
+    toggleButton.setAttribute("aria-expanded", "false");
+    buttonLabel.textContent = "Show changes";
+    content.before(labels);
+    view?.destroy();
+    view = null;
+  };
+
+  toggleButton.addEventListener("click", async () => {
+    if (!panel.hidden) {
+      close();
+      return;
+    }
+    if (opening) return;
+    opening = true;
+    toggleButton.disabled = true;
+    try {
+      const { createDiffView } = await import("../vendor/codemirror/diff-view.js");
+      panel.hidden = false;
+      view = createDiffView(content, state.baseData.length ? osmDataToL0L(state.baseData) : "", editor.value);
+      view.dom.prepend(labels);
+      for (const element of coveredElements) element.inert = true;
+      toggleButton.setAttribute("aria-expanded", "true");
+      buttonLabel.textContent = "Hide changes";
+      try {
+        const uploadData = buildUploadData(editor, validationElement);
+        state.oscPreview = createOsc(uploadData, 1234);
+        setStatus(statusElement, "Built osmChange preview.");
+      } catch (error) {
+        state.oscPreview = "";
+        setStatus(statusElement, error.message, "error");
+      }
+      renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
+      persistWorkspaceState(urlInput, osmDataField, editor);
+    } catch (error) {
+      close();
+      setStatus(statusElement, `Could not open diff: ${error.message}`, "error");
+    } finally {
+      opening = false;
+      toggleButton.disabled = false;
+      toggleButton.focus({ preventScroll: true });
+    }
+  });
 }
 
 function renderThemeSettings(themeSelect) {
@@ -1043,7 +1109,6 @@ function bindEditorActions(
   revertButton,
   clearButton,
   validateButton,
-  showOscButton,
   downloadButton,
   urlInput,
   fileInput,
@@ -1090,21 +1155,6 @@ function bindEditorActions(
       }
     } catch (error) {
       setStatus(statusElement, error.message, "error");
-    }
-  });
-
-  showOscButton.addEventListener("click", () => {
-    try {
-      const uploadData = buildUploadData(level0lField, validationElement);
-      state.oscPreview = createOsc(uploadData, 1234);
-      renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
-      setStatus(statusElement, "Built osmChange preview.");
-      persistWorkspaceState(urlInput, osmDataField, level0lField);
-    } catch (error) {
-      state.oscPreview = "";
-      renderOscPreview(oscSectionElement, oscPreviewElement, state.oscPreview);
-      setStatus(statusElement, error.message, "error");
-      persistWorkspaceState(urlInput, osmDataField, level0lField);
     }
   });
 
@@ -1920,7 +1970,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const revertButton = document.querySelector("#revert");
   const clearButton = document.querySelector("#clear");
   const validateButton = document.querySelector("#validate");
-  const showOscButton = document.querySelector("#show-osc");
   const downloadButton = document.querySelector("#download");
   const convertButton = document.querySelector("#convert");
   const uploadButton = document.querySelector("#upload");
@@ -2061,6 +2110,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   bindThemeSettings(serverFormElements.themeSelect);
   bindWorkspacePersistence(urlInput, osmDataField, level0lField);
+  bindDiffControl(
+    document.querySelector("#diff-toggle"),
+    document.querySelector("#diff-panel"),
+    document.querySelector("#diff-content"),
+    level0lField,
+    urlInput,
+    osmDataField,
+    statusElement,
+    validationElement,
+    oscSectionElement,
+    oscPreviewElement
+  );
   bindSearchReplaceControl(
     searchReplaceOpenButton,
     searchReplacePanelWrap,
@@ -2104,7 +2165,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     revertButton,
     clearButton,
     validateButton,
-    showOscButton,
     downloadButton,
     urlInput,
     fileInput,

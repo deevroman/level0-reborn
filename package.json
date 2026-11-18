@@ -2,11 +2,18 @@
   "version": "0.5",
   "type": "module",
   "scripts": {
+    "build:diff": "esbuild src/js/diff-view.js --bundle --format=esm --minify --legal-comments=inline --outfile=src/vendor/codemirror/diff-view.js",
     "lint": "eslint src tests eslint.config.mjs",
     "test": "node --test",
     "version:sync": "sed -i.bak -E \"s#(EDITOR_VERSION = \\\")[^\\\"]+(\\\";)#\\\\1$npm_package_version\\\\2#\" src/js/config.js && sed -i.bak -E \"s#(Level0 Reborn v)[^\\\"]+(\\\")#\\\\1$npm_package_version\\\\2#\" index.html && sed -i.bak -E \"s#(Level0 Reborn v)[0-9A-Za-z.+-]+#\\\\1$npm_package_version#\" index.html && rm src/js/config.js.bak index.html.bak"
   },
   "dependencies": {
+    "@codemirror/merge": "^6.12.3",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
     "eslint": "9.26.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }
