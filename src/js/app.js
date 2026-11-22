@@ -1,4 +1,5 @@
 import { loadIncompleteRelationData, loadSupportedFile, loadSupportedUrl } from "./api.js";
+import { applyEditorReplacement } from "./editor-replacement.js";
 import {
   clearStoredAuth,
   exchangeAuthCodeForToken,
@@ -1907,14 +1908,7 @@ function bindSearchReplaceControl(
       : replaceSearchMatch(originalText, search, replaceInput.value, regexEnabled, replacedMatch);
 
     if (updatedText !== originalText) {
-      level0lField.focus();
-      level0lField.setSelectionRange(0, originalText.length);
-      const applied = updatedText.length > 0
-        ? document.execCommand("insertText", false, updatedText)
-        : document.execCommand("delete");
-
-      if (!applied) {
-        level0lField.setSelectionRange(0, 0);
+      if (!applyEditorReplacement(level0lField, updatedText, replaceAll, navigator, document)) {
         setStatus(statusElement, "Could not replace text with undo support in this browser.", "error");
         return;
       }
