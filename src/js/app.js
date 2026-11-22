@@ -1,5 +1,5 @@
 import { loadIncompleteRelationData, loadSupportedFile, loadSupportedUrl } from "./api.js";
-import { applyEditorReplacement } from "./editor-replacement.js";
+import { applyEditorReplacement, preservePageScroll } from "./editor-replacement.js";
 import {
   clearStoredAuth,
   exchangeAuthCodeForToken,
@@ -1839,7 +1839,7 @@ function bindSearchReplaceControl(
       navigatedMatch = match;
       refreshCount();
       if (!keepButtonFocus) {
-        level0lField.focus();
+        level0lField.focus({ preventScroll: true });
       }
       level0lField.setSelectionRange(match.index, match.index + match.length);
     } catch (error) {
@@ -1861,11 +1861,11 @@ function bindSearchReplaceControl(
   }
 
   previousButton.addEventListener("click", (event) => {
-    moveToMatch("previous", event.detail === 0);
+    preservePageScroll(window, () => moveToMatch("previous", event.detail === 0));
   });
 
   nextButton.addEventListener("click", (event) => {
-    moveToMatch("next", event.detail === 0);
+    preservePageScroll(window, () => moveToMatch("next", event.detail === 0));
   });
 
   const replaceMatches = (replaceAll) => {
@@ -1931,20 +1931,22 @@ function bindSearchReplaceControl(
       refreshCount();
       const caretPosition = nextMatch?.index ?? nextSearchStart;
 
-      level0lField.focus();
+      level0lField.focus({ preventScroll: true });
       level0lField.setSelectionRange(caretPosition, caretPosition);
     }
   };
 
   replaceButton.addEventListener("click", (event) => {
     const keepButtonFocus = event.detail === 0;
-    try {
-      replaceMatches(false);
-    } finally {
-      if (keepButtonFocus) {
-        replaceButton.focus({ preventScroll: true });
+    preservePageScroll(window, () => {
+      try {
+        replaceMatches(false);
+      } finally {
+        if (keepButtonFocus) {
+          replaceButton.focus({ preventScroll: true });
+        }
       }
-    }
+    });
   });
 
   applyButton.addEventListener("click", () => {

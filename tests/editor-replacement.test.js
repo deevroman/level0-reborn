@@ -8,6 +8,11 @@ const firefox = { userAgent: "Mozilla/5.0 Firefox/130.0" };
 function makeEditor(value) {
   return {
     value,
+    selectionStart: 2,
+    selectionEnd: 2,
+    selectionDirection: "none",
+    scrollTop: 120,
+    scrollLeft: 10,
     events: [],
     selections: [],
     focus() {},
@@ -33,7 +38,21 @@ test("Chrome Replace All updates the editor without a native editing command", (
   assert.equal(editor.events.length, 1);
   assert.equal(editor.events[0].type, "input");
   assert.equal(editor.events[0].bubbles, true);
-  assert.deepEqual(editor.selections, []);
+  assert.deepEqual(editor.selections, [[2, 2]]);
+});
+
+test("Replace All preserves editor and page scroll positions", () => {
+  for (const browser of [chrome, firefox]) {
+    const editor = makeEditor("old text");
+    const viewport = { scrollX: 10, scrollY: 300, scrollTo(options) { this.scrollX = options.left; this.scrollY = options.top; } };
+    editor.focus = () => { viewport.scrollY = 900; };
+    editor.dispatchEvent = () => { editor.scrollTop = 999; viewport.scrollY = 900; };
+    const doc = { defaultView: viewport, execCommand() { editor.scrollTop = 999; return true; } };
+    assert.equal(applyEditorReplacement(editor, "new text", true, browser, doc), true);
+    assert.equal(editor.scrollTop, 120);
+    assert.equal(editor.scrollLeft, 10);
+    assert.equal(viewport.scrollY, 300);
+  }
 });
 
 test("single replacement in Chrome and Replace All in Firefox keep native undo", () => {
