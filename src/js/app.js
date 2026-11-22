@@ -1122,6 +1122,9 @@ function bindEditorActions(
   oscPreviewElement
 ) {
   revertButton.addEventListener("click", () => {
+    if (!window.confirm("Revert the editor to the originally loaded data?")) {
+      return;
+    }
     setEditorFromBase(level0lField);
     renderValidation(validationElement, []);
     state.oscPreview = "";
@@ -1131,6 +1134,9 @@ function bindEditorActions(
   });
 
   clearButton.addEventListener("click", () => {
+    if (!window.confirm("Clear?")) {
+      return;
+    }
     clearEditorState(
       urlInput,
       fileInput,
