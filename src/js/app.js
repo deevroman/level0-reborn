@@ -1660,7 +1660,7 @@ function bindSearchReplaceControl(
         validationLines.set(line, isError ? "validation-error" : "validation-warning");
       }
     }
-    const hasHighlights = matches.length > 0 || validationLines.size > 0;
+    const hasHighlights = matches.length > 0 || validationLines.size > 0 || navigatedMatch?.length === 0;
     highlights.hidden = !hasHighlights;
     editorColumn.classList.toggle("is-highlighting", hasHighlights);
     if (!hasHighlights) {
@@ -1712,6 +1712,40 @@ function bindSearchReplaceControl(
   const refreshCount = () => {
     updateSearchReplaceCount(countElement, level0lField, searchInput, regexCheckbox, navigatedMatch);
     refreshHighlights();
+  };
+
+  /** @returns {void} */
+  const scrollToNavigatedMatch = () => {
+    syncHighlightSizeAndScroll();
+    const target = highlights.querySelector(".replace-target");
+    let rect = target?.getClientRects()[0];
+    if (!rect && navigatedMatch) {
+      const walker = document.createTreeWalker(highlights, NodeFilter.SHOW_TEXT);
+      let remaining = navigatedMatch.index;
+      let node = walker.nextNode();
+      while (node && remaining >= node.length) {
+        const next = walker.nextNode();
+        if (!next) break;
+        remaining -= node.length;
+        node = next;
+      }
+      if (node) {
+        const range = document.createRange();
+        range.setStart(node, Math.min(remaining, node.length));
+        range.collapse(true);
+        rect = range.getBoundingClientRect();
+      }
+    }
+    if (!rect || rect.height === 0) return;
+
+    const bounds = highlights.getBoundingClientRect();
+    const margin = 10;
+    if (rect.top < bounds.top + margin) {
+      level0lField.scrollTop += rect.top - bounds.top - margin;
+    } else if (rect.bottom > bounds.bottom - margin) {
+      level0lField.scrollTop += rect.bottom - bounds.bottom + margin;
+    }
+    syncHighlightSizeAndScroll();
   };
   level0lField.addEventListener("scroll", syncHighlightSizeAndScroll);
   if (typeof ResizeObserver !== "undefined") {
@@ -1848,6 +1882,7 @@ function bindSearchReplaceControl(
         level0lField.focus({ preventScroll: true });
       }
       level0lField.setSelectionRange(match.index, match.index + match.length);
+      scrollToNavigatedMatch();
     } catch (error) {
       setStatus(statusElement, error.message, "error");
     }
